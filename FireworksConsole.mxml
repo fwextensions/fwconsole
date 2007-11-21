@@ -8,7 +8,7 @@
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.1.0 ($Revision$)
+	Release - 0.2.0 ($Revision$)
 	Last update - $Date$
 -->
 
@@ -36,6 +36,7 @@
 		<mx:Button 
 			label="Clear"
 			toolTip="Clear the history area" 
+			click="clearOutput();"
 		/>
 	</mx:ApplicationControlBar>
 
