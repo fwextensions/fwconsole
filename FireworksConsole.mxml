@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+	File: Fireworks Console.mxml
+
+	Author - John Dunning
+	Copyright - 2007 John Dunning.  All rights reserved.
+	Email - fw@johndunning.com
+	Website - http://johndunning.com/fireworks
+
+	Release - 0.1.0 ($Revision$)
+	Last update - $Date$
+-->
+
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="absolute"
+	width="100%"
+	height="100%"
+	horizontalAlign="left"	
+	applicationComplete="main()" 
+>
+<!--
+		<mx:SWFLoader id="MMECBridge" source="@Embed(source='lib/MMEndCommandBridge.swf')" height="0" width="0"/>
+	<mx:Script source="lib/fwlog.as" />
+	<mx:Script source="QSScorer.as" />
+-->
+	<mx:Script source="FireworksConsoleMain.as" />
+	
+	<mx:ApplicationControlBar 
+		dock="true" 
+		paddingTop="4" 
+		paddingRight="4" 
+		paddingBottom="4"
+		paddingLeft="4"
+	>
+		<mx:Button 
+			label="Clear"
+			toolTip="Clear the history area" 
+		/>
+	</mx:ApplicationControlBar>
+
+	<mx:VDividedBox
+		backgroundColor="0xDADEE3"
+		width="100%"
+		height="100%"
+		paddingTop="10"
+		paddingRight="4"
+		paddingBottom="4"
+		paddingLeft="4"
+	>
+		<mx:TextArea id="Input"
+			width="100%"
+		/>
+		<mx:TextArea id="Output"
+			width="100%"
+			editable="false"
+			horizontalScrollPolicy="off" 
+		/>
+	</mx:VDividedBox>
+	
+</mx:Application>
