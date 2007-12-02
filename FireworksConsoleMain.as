@@ -20,6 +20,7 @@ import flash.ui.Keyboard;
 import mx.controls.TextArea;
 import mx.events.FlexEvent;
 import adobe.utils.*;
+import com.serialization.json.*;
 //import FireworksConsoleApp;
 
 
@@ -41,7 +42,8 @@ private function main() : void
 	inputArea.addEventListener(KeyboardEvent.KEY_UP, onInputKeyUp, false, 0, true);
 	inputArea.setFocus();
 	
-	outputArea.text = prefs.data.savedOutput || "";
+	outputArea.htmlText = prefs.data.savedOutput || "";
+	outputArea.validateNow();
 	outputArea.verticalScrollPosition = outputArea.maxVerticalScrollPosition;
 	
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
@@ -49,6 +51,8 @@ private function main() : void
 	
 	addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
 	addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
+	
+	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
 }
 
 
@@ -58,8 +62,11 @@ private function evaluateCode() : void
 try {
 	var code:String = inputArea.text.slice(0, -1);
 	addCodeEntry(code);
-	var result:String = MMExecute("(" + code + ")");
-	print(">>> " + code + ": " + result + "\n");
+	
+		// serialize the code string to handle quotations, newlines, etc.
+	var result:String = MMExecute('jdlib.FireworksConsole.evaluateCode(' + JSON.serialize(code) + ')');
+	
+	print(">>> " + code, result + "\n");
 	inputArea.text = "";
 } catch (e:*) {
 fwlog(e.message);
@@ -69,10 +76,20 @@ fwlog(e.message);
 
 // ===========================================================================
 private function print(
+	inPrefix:String,
 	inText:String) : void
 {
-	outputArea.text += inText;
-	prefs.data.savedOutput = outputArea.text;
+	if (inPrefix) {
+		inPrefix = inPrefix.replace(/&/g, "&amp;");
+		inPrefix = inPrefix.replace(/</g, "&lt;");
+		inPrefix = inPrefix.replace(/>/g, "&gt;");
+		outputArea.htmlText += '<font color="#585880">' + inPrefix + "</font>: " + inText;
+	} else {
+			// there's no prefix, so we don't need to deal with html-formatted text
+		outputArea.text += inText;
+	}
+	 
+	prefs.data.savedOutput = outputArea.htmlText;
 	prefs.flush(90);
 	
 		// force the texta area to validate so we get the correct max scroll 
