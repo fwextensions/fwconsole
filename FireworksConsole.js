@@ -26,25 +26,7 @@ jdlib = jdlib || {};
 // ===========================================================================
 jdlib.FireworksConsole = (function()
 {
-	function evaluateCode(
-		inCode)
-	{
-		var dom = fw.getDocumentDOM();
-		var sel = fw.selection;
-		var __e__;
-		var __r__;
-		
-		try {
-			__r__ = StringFormatter.format(eval(inCode));
-		} catch (__e__) {
-			__r__ = __e__.toString();
-		}
-		
-		return __r__;
-	}
-
-
-	var StringFormatter = {
+	var __StringFormatter__ = {
 		format: function(
 			inValue,
 			inDepth)
@@ -167,8 +149,32 @@ jdlib.FireworksConsole = (function()
 			return "undefined";
 		}
 	};
+	
+	
+	function useDojo()
+	{
+		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
+	}
 
 	
+	function evaluateCode(
+		inCode)
+	{
+		var dom = fw.getDocumentDOM();
+		var sel = fw.selection;
+		var __e__;
+		var __r__;
+		
+		try {
+			__r__ = __StringFormatter__.format(eval(inCode));
+		} catch (__e__) {
+			__r__ = __e__.toString();
+		}
+		
+		return __r__;
+	}
+
+
 	return {
 		version: "$Revision$".match(/ ([0-9.]+) /)[1],
 		evaluateCode: evaluateCode

@@ -21,6 +21,7 @@ import mx.controls.TextArea;
 import mx.events.FlexEvent;
 import adobe.utils.*;
 import com.serialization.json.*;
+import bigroom.input.KeyPoll;
 //import FireworksConsoleApp;
 
 
@@ -31,6 +32,7 @@ private var prefs:SharedObject = SharedObject.getLocal("FWConsolePrefs");
 private var inputArea:TextArea;
 private var outputArea:TextArea;
 private var currentCodeEntry:int = 0;
+private var key:KeyPoll = null;
 
   
 // ===========================================================================
@@ -39,7 +41,8 @@ private function main() : void
 	inputArea = Input;
 	outputArea = Output;
 	
-	inputArea.addEventListener(KeyboardEvent.KEY_UP, onInputKeyUp, false, 0, true);
+	inputArea.addEventListener(KeyboardEvent.KEY_DOWN, onInputKeyDown, true, 0, true);
+	inputArea.addEventListener(TextEvent.TEXT_INPUT, onTextInput, false, 0, true);
 	inputArea.setFocus();
 	
 	outputArea.htmlText = prefs.data.savedOutput || "";
@@ -48,6 +51,10 @@ private function main() : void
 	
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
+	
+		// create a KeyPoll so we can tell whether the ctrl key is down when enter
+		// is pressed
+	key = new KeyPoll(stage);
 	
 	addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
 	addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
@@ -60,14 +67,20 @@ private function main() : void
 private function evaluateCode() : void
 {
 try {
-	var code:String = inputArea.text.slice(0, -1);
+//	var code:String = inputArea.text.slice(0, -1);
+	var code:String = inputArea.text;
+	
+	if (code.length == 0) {
+		return;
+	}
+	
 	addCodeEntry(code);
+	inputArea.text = "";
 	
 		// serialize the code string to handle quotations, newlines, etc.
 	var result:String = MMExecute('jdlib.FireworksConsole.evaluateCode(' + JSON.serialize(code) + ')');
 	
 	print(">>> " + code, result + "\n");
-	inputArea.text = "";
 } catch (e:*) {
 fwlog(e.message);
 }
@@ -157,19 +170,25 @@ private function clearOutput() : void
 
 
 // ===========================================================================
-private function onInputKeyUp(
+private function onTextInput(
+	inEvent:TextEvent) : void
+{
+	var ascii:int = inEvent.text.charCodeAt(0);
+	
+		// don't allow newlines or returns, unless ctrl is down
+	if (!key.isDown(Keyboard.CONTROL) && (ascii == 13 || ascii == 10)) {
+		inEvent.preventDefault();
+		inEvent.stopPropagation();
+		evaluateCode();
+	}
+}
+
+
+// ===========================================================================
+private function onInputKeyDown(
 	inEvent:KeyboardEvent) : void
 {
 	switch (inEvent.keyCode) {
-		case Keyboard.ENTER:
-			if (inEvent.ctrlKey) {
-			} else {
-				evaluateCode();
-//				inEvent.preventDefault();
-//				inEvent.stopPropagation();
-			}
-			break;
-			
 		case Keyboard.UP:
 			if (inEvent.altKey) {
 				showPreviousCodeEntry();

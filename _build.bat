@@ -4,7 +4,7 @@ REM SET OPTS=-use-network=false -library-path+=../../frameworks/locale/{locale} 
 REM SET OPTS=-use-network=true -output=C:\Projects\LCD Frame\Slideshow\resources\ImageDisplay.swf
 REM SET OPTS=-use-network=true 
 
-SET OPTS=-use-network=true -library-path+=assets -library-path+=..\lib -theme assets\Ice.css -keep-generated-actionscript=true  
+SET OPTS=-use-network=true -library-path+=assets -library-path+=..\lib -source-path+=..\src -theme assets\Ice.css -keep-generated-actionscript=true  
 rem SET OPTS=-use-network=true -library-path+=assets -theme "C:\Projects\Fireworks\Commands\Dev\FWConsole\assets\Ice.css" -strict=false -keep-generated-actionscript=true  
 
 C:\Software\Development\Flex\flex2_sdk_hf1\bin\mxmlc %OPTS% -output FireworksConsole.swf FireworksConsole.mxml
