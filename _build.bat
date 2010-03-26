@@ -12,4 +12,4 @@ C:\Software\Development\Flex\flex2_sdk_hf1\bin\mxmlc %OPTS% -output FireworksCon
 cp "FireworksConsole.swf" "C:\Program Files\Adobe\Adobe Fireworks CS4\Configuration\Command Panels\Fireworks Console.swf"
 move "FireworksConsole.swf" "C:\Program Files\Adobe\Adobe Fireworks CS3\Configuration\Command Panels\Fireworks Console.swf"
 
- pause
+rem pause

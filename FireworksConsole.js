@@ -98,6 +98,9 @@ jdlib.FireworksConsole = (function()
 		
 			for (var i = 0, len = keys.length; i < len; i++) {
 				var key = keys[i];
+				
+					// skip javascriptString, since it's a string representation
+					// of the object, which we're building ourselves
 				if (key != "javascriptString") {
 					attributes.push(key + ": " + this.format(inObject[key], inDepth + 1));
 				}

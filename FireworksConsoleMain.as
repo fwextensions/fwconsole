@@ -12,6 +12,16 @@
 
    ======================================================================== */
 
+/*
+
+	To do:
+		- convert AS objects to JSON and send string to console
+		
+		- remember and restore state of divider
+		
+		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
+		
+*/
 
 import flash.events.*;
 import flash.net.LocalConnection;
@@ -29,10 +39,12 @@ include "assets/fwlog.as";
 
 
 private var prefs:SharedObject = SharedObject.getLocal("FWConsolePrefs");
+private var consoleLC:LocalConnection = new LocalConnection();
 private var inputArea:TextArea;
 private var outputArea:TextArea;
 private var currentCodeEntry:int = 0;
 private var key:KeyPoll = null;
+private var isFCJSLoaded:Boolean = false;
 
   
 // ===========================================================================
@@ -56,10 +68,18 @@ private function main() : void
 		// is pressed
 	key = new KeyPoll(stage);
 	
-	addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
-	addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
+	stage.addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
+	stage.addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
 	
-	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
+		// the app's pixel size specified in the mxml is used by FW as the min size. 
+		// we now want the app to resize to fill the window.
+	percentWidth = 100;
+	percentHeight = 100;
+	
+	initLocalConnection();
+	
+	loadFCJS();
+//	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
 }
 
 
@@ -67,7 +87,6 @@ private function main() : void
 private function evaluateCode() : void
 {
 try {
-//	var code:String = inputArea.text.slice(0, -1);
 	var code:String = inputArea.text;
 	
 	if (code.length == 0) {
@@ -96,6 +115,10 @@ private function print(
 		inPrefix = inPrefix.replace(/&/g, "&amp;");
 		inPrefix = inPrefix.replace(/</g, "&lt;");
 		inPrefix = inPrefix.replace(/>/g, "&gt;");
+		inText = inText.replace(/&/g, "&amp;");
+		inText = inText.replace(/</g, "&lt;");
+		inText = inText.replace(/>/g, "&gt;");
+		
 		outputArea.htmlText += '<font color="#585880">' + inPrefix + "</font>: " + inText;
 	} else {
 			// there's no prefix, so we don't need to deal with html-formatted text
@@ -166,6 +189,43 @@ private function clearOutput() : void
 {
 	outputArea.text = "";
 	prefs.data.savedOutput = "";
+}
+
+
+// ===========================================================================
+internal function initLocalConnection() : void
+{
+		// the main app object implements the functions that can be called by
+		// the LocalConnection (log)
+	consoleLC.client = this;
+	consoleLC.connect("FireworksConsole");
+}
+
+
+// ===========================================================================
+public function log(
+	inMessage:String) : void
+{
+	if (inMessage && inMessage.length) {
+			// add a newline here, since print just prints whatever it gets
+		print("", inMessage + "\n");
+	}
+}
+
+
+// ===========================================================================
+internal function loadFCJS() : void
+{
+	if (isFCJSLoaded) {
+//		return;
+	}
+	
+//	if (MMExecute('(typeof jdlib == "object" && jdlib != null) ? (jdlib.FireworksConsole ? "loaded" : "unloaded") : "unloaded"') == "unloaded") {
+			// load the embedded JS into FW, since it hasn't been during this session
+		MMExecute((new FireworksConsoleJS()).toString());
+//	}
+	
+	isFCJSLoaded = true;
 }
 
 

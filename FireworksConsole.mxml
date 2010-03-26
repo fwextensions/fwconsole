@@ -14,8 +14,8 @@
 
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" 
 	layout="absolute"
-	width="100%"
-	height="100%"
+	width="200"
+	height="150"
 	horizontalAlign="left"	
 	applicationComplete="main()" 
 >
@@ -34,6 +34,11 @@
 		paddingLeft="4"
 	>
 		<mx:Button 
+			label="Eval"
+			toolTip="Evaluate the entered JavaScript" 
+			click="evaluateCode();"
+		/>
+		<mx:Button 
 			label="Clear"
 			toolTip="Clear the history area" 
 			click="clearOutput();"
@@ -51,6 +56,7 @@
 	>
 		<mx:TextArea id="Input"
 			width="100%"
+			toolTip="Press return to evaluate. Press ctrl-return for a newline."
 		/>
 		<mx:TextArea id="Output"
 			width="100%"
