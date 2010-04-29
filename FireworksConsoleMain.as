@@ -16,11 +16,22 @@
 
 	To do:
 		- convert AS objects to JSON and send string to console
-		
-		- remember and restore state of divider
+
+		- provide console.log() for JS
+			stores each log entry in an array
+			track time of last log entry
+			panel can poll the log every few seconds and dump out anything new
+			need option to turn off polling
+
+		- remember the divider size as a percentage, and restore based on the
+			current height of the 
+
+		- remember max number of code entries? 
 		
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
-		
+
+	Done:
+		- remember and restore state of divider
 */
 
 import flash.events.*;
@@ -28,54 +39,49 @@ import flash.net.LocalConnection;
 import flash.net.SharedObject;
 import flash.ui.Keyboard;
 import mx.controls.TextArea;
-import mx.events.FlexEvent;
+import mx.controls.Alert;
+import mx.events.*;
 import adobe.utils.*;
 import com.serialization.json.*;
-import bigroom.input.KeyPoll;
-//import FireworksConsoleApp;
 
 
-include "assets/fwlog.as";
+//include "assets/fwlog.as";
 
 
 private var prefs:SharedObject = SharedObject.getLocal("FWConsolePrefs");
 private var consoleLC:LocalConnection = new LocalConnection();
-private var inputArea:TextArea;
-private var outputArea:TextArea;
 private var currentCodeEntry:int = 0;
-private var key:KeyPoll = null;
-private var isFCJSLoaded:Boolean = false;
+private var isShiftDown:Boolean = false;
 
   
 // ===========================================================================
 private function main() : void 
 {
-	inputArea = Input;
-	outputArea = Output;
+	IOContainer.addEventListener(DividerEvent.DIVIDER_RELEASE, onDividerRelease, false, 0, true);
 	
-	inputArea.addEventListener(KeyboardEvent.KEY_DOWN, onInputKeyDown, true, 0, true);
-	inputArea.addEventListener(TextEvent.TEXT_INPUT, onTextInput, false, 0, true);
-	inputArea.setFocus();
+	Input = Input;
+	Output = Output;
 	
-	outputArea.htmlText = prefs.data.savedOutput || "";
-	outputArea.validateNow();
-	outputArea.verticalScrollPosition = outputArea.maxVerticalScrollPosition;
+	Input.addEventListener(KeyboardEvent.KEY_DOWN, onInputKeyDown, true, 0, true);
+	Input.addEventListener(KeyboardEvent.KEY_UP, onInputKeyUp, true, 0, true);
+	Input.addEventListener(TextEvent.TEXT_INPUT, onTextInput, false, 0, true);
+	Input.setFocus();
+
+	Output.htmlText = prefs.data.savedOutput || "";
+	Output.validateNow();
+	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
 	
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
 	
-		// create a KeyPoll so we can tell whether the ctrl key is down when enter
-		// is pressed
-	key = new KeyPoll(stage);
-	
 	stage.addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
 	stage.addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
-	
-		// the app's pixel size specified in the mxml is used by FW as the min size. 
-		// we now want the app to resize to fill the window.
-	percentWidth = 100;
-	percentHeight = 100;
-	
+
+		// default to a height of 50 for the 
+	prefs.data.dividerY = prefs.data.dividerY || 50;
+	IOContainer.getDividerAt(0).y = prefs.data.dividerY;
+
+		// make console.log() available to other panels
 	initLocalConnection();
 	
 	loadFCJS();
@@ -87,21 +93,21 @@ private function main() : void
 private function evaluateCode() : void
 {
 try {
-	var code:String = inputArea.text;
+	var code:String = Input.text;
 	
 	if (code.length == 0) {
 		return;
 	}
 	
 	addCodeEntry(code);
-	inputArea.text = "";
+	Input.text = "";
 	
 		// serialize the code string to handle quotations, newlines, etc.
 	var result:String = MMExecute('jdlib.FireworksConsole.evaluateCode(' + JSON.serialize(code) + ')');
 	
 	print(">>> " + code, result + "\n");
 } catch (e:*) {
-fwlog(e.message);
+//fwlog(e.message);
 }
 }
 
@@ -112,6 +118,8 @@ private function print(
 	inText:String) : void
 {
 	if (inPrefix) {
+			// we want the prefix to be a different color, so we'll use htmlText,
+			// which means all the <>& characters need to be replaced with entities
 		inPrefix = inPrefix.replace(/&/g, "&amp;");
 		inPrefix = inPrefix.replace(/</g, "&lt;");
 		inPrefix = inPrefix.replace(/>/g, "&gt;");
@@ -119,19 +127,19 @@ private function print(
 		inText = inText.replace(/</g, "&lt;");
 		inText = inText.replace(/>/g, "&gt;");
 		
-		outputArea.htmlText += '<font color="#585880">' + inPrefix + "</font>: " + inText;
+		Output.htmlText += '<font color="#585880">' + inPrefix + "</font>: " + inText;
 	} else {
 			// there's no prefix, so we don't need to deal with html-formatted text
-		outputArea.text += inText;
+		Output.text += inText;
 	}
 	 
-	prefs.data.savedOutput = outputArea.htmlText;
+	prefs.data.savedOutput = Output.htmlText;
 	prefs.flush(90);
 	
-		// force the texta area to validate so we get the correct max scroll 
+		// force the text area to validate so we get the correct max scroll
 		// height after adding the text
-	outputArea.validateNow();
-	outputArea.verticalScrollPosition = outputArea.maxVerticalScrollPosition;
+	Output.validateNow();
+	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
 }
 
 
@@ -139,9 +147,9 @@ private function print(
 private function setInputText(
 	inText:String) : void
 {
-	inputArea.text = inText;
-	var len:int = inputArea.text.length;
-	inputArea.setSelection(len, len);
+	Input.text = inText;
+	var len:int = Input.text.length;
+	Input.setSelection(len, len);
 }
 
 
@@ -187,13 +195,13 @@ private function showNextCodeEntry() : void
 // ===========================================================================
 private function clearOutput() : void
 {
-	outputArea.text = "";
+	Output.text = "";
 	prefs.data.savedOutput = "";
 }
 
 
 // ===========================================================================
-internal function initLocalConnection() : void
+private function initLocalConnection() : void
 {
 		// the main app object implements the functions that can be called by
 		// the LocalConnection (log)
@@ -214,18 +222,10 @@ public function log(
 
 
 // ===========================================================================
-internal function loadFCJS() : void
+private function loadFCJS() : void
 {
-	if (isFCJSLoaded) {
-//		return;
-	}
-	
-//	if (MMExecute('(typeof jdlib == "object" && jdlib != null) ? (jdlib.FireworksConsole ? "loaded" : "unloaded") : "unloaded"') == "unloaded") {
-			// load the embedded JS into FW, since it hasn't been during this session
-		MMExecute((new FireworksConsoleJS()).toString());
-//	}
-	
-	isFCJSLoaded = true;
+		// load the embedded JS into FW, since it hasn't been during this session
+	MMExecute((new FireworksConsoleJS()).toString());
 }
 
 
@@ -235,8 +235,10 @@ private function onTextInput(
 {
 	var ascii:int = inEvent.text.charCodeAt(0);
 	
-		// don't allow newlines or returns, unless ctrl is down
-	if (!key.isDown(Keyboard.CONTROL) && (ascii == 13 || ascii == 10)) {
+		// don't allow newlines or returns, unless shift is down
+	if (!isShiftDown && (ascii == 13 || ascii == 10)) {
+			// stop the event propagation so that he newline doesn't get
+			// added to the text
 		inEvent.preventDefault();
 		inEvent.stopPropagation();
 		evaluateCode();
@@ -250,17 +252,41 @@ private function onInputKeyDown(
 {
 	switch (inEvent.keyCode) {
 		case Keyboard.UP:
-			if (inEvent.altKey) {
+			if (inEvent.ctrlKey) {
 				showPreviousCodeEntry();
 			}
 			break;
 			
 		case Keyboard.DOWN:
-			if (inEvent.altKey) {
+			if (inEvent.ctrlKey) {
 				showNextCodeEntry();
 			}
 			break;
 	}
+
+		// track whether the shift key is down so we can check its state in
+		// onTextInput
+	isShiftDown = inEvent.shiftKey;
+}
+
+
+// ===========================================================================
+private function onInputKeyUp(
+	inEvent:KeyboardEvent) : void
+{
+		// track whether the shift key is up so we can check its state in
+		// onTextInput
+	isShiftDown = inEvent.shiftKey;
+}
+
+
+// ===========================================================================
+private function onDividerRelease(
+	inEvent:DividerEvent) : void
+{
+		// store the current divider location so we can restore when next loaded
+	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
+	prefs.flush(90);
 }
 
 
@@ -268,7 +294,7 @@ private function onInputKeyDown(
 private function onError(
 	inEvent:ErrorEvent) : void
 {
-fwlog("Error", inEvent.text);
+//fwlog("Error", inEvent.text);
 }
 
 
@@ -276,7 +302,8 @@ fwlog("Error", inEvent.text);
 private function onExit(
 	inEvent:FlexEvent) : void
 {
-fwlog("exit");
-	prefs.data.savedOutput = outputArea.text;
+//fwlog("exit");
+	prefs.data.savedOutput = Output.text;
+	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
 	prefs.flush(90);
 }

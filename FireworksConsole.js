@@ -14,9 +14,8 @@
 
 
 /*
-  
 	To do:
-			
+		- add console.log() API
 */
 
   

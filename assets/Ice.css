@@ -40,6 +40,10 @@ TextArea
 	fontSize: 12;
 }
 
+Button {
+	color:				#dddddd;
+	textRollOverColor:	#ffffff;
+}
 
 /*
 //------------------------------

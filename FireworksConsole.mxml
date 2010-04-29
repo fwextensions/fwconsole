@@ -14,16 +14,11 @@
 
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" 
 	layout="absolute"
-	width="200"
-	height="150"
+	width="100%"
+	height="100%"
 	horizontalAlign="left"	
 	applicationComplete="main()" 
 >
-<!--
-		<mx:SWFLoader id="MMECBridge" source="@Embed(source='lib/MMEndCommandBridge.swf')" height="0" width="0"/>
-	<mx:Script source="lib/fwlog.as" />
-	<mx:Script source="QSScorer.as" />
--->
 	<mx:Script source="FireworksConsoleMain.as" />
 	
 	<mx:ApplicationControlBar 
@@ -45,7 +40,8 @@
 		/>
 	</mx:ApplicationControlBar>
 
-	<mx:VDividedBox
+	<mx:VDividedBox id="IOContainer"
+		liveDragging="true"
 		backgroundColor="0xDADEE3"
 		width="100%"
 		height="100%"
@@ -56,10 +52,12 @@
 	>
 		<mx:TextArea id="Input"
 			width="100%"
-			toolTip="Press return to evaluate. Press ctrl-return for a newline."
+			minHeight="25"
+			toolTip="Press return to evaluate. Press shift-return for a newline."
 		/>
 		<mx:TextArea id="Output"
 			width="100%"
+			minHeight="100"
 			editable="false"
 			horizontalScrollPolicy="off" 
 		/>
