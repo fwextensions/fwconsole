@@ -38,6 +38,12 @@
 			toolTip="Clear the history area" 
 			click="clearOutput();"
 		/>
+		<mx:Spacer width="100%" />
+		<mx:Button
+			label="Print .jsf Console"
+			toolTip="Print recent calls to console.log()"
+			click="printLog();"
+		/>
 	</mx:ApplicationControlBar>
 
 	<mx:VDividedBox id="IOContainer"

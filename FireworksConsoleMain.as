@@ -17,11 +17,24 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
+		- provide option to poll or not
+
+		- don't poll if text tool is active? 
+
 		- provide console.log() for JS
 			stores each log entry in an array
 			track time of last log entry
 			panel can poll the log every few seconds and dump out anything new
 			need option to turn off polling
+			unfortunately, we can't poll, because if the panel makes a JS call
+				while another command is running, it will trigger the modal
+				processing dialog, which blocks the UI
+				we'll have to add a button to dump the log on demand
+
+		- support multiple log types
+			"assert", "count", "debug", "dir", "dirxml", "error", "group",
+			"groupEnd", "info", "log", "profile", "profileEnd", "time",
+			"timeEnd", "trace", "warn"
 
 		- remember the divider size as a percentage, and restore based on the
 			current height of the 
@@ -42,16 +55,24 @@ import mx.controls.TextArea;
 import mx.controls.Alert;
 import mx.events.*;
 import adobe.utils.*;
-import com.serialization.json.*;
+import com.adobe.serialization.json.*;
 
 
 //include "assets/fwlog.as";
 
 
+// ===========================================================================
+private const ConsolePollInterval:uint = 3000;
+private const LogEntryPrefix:String = ">>>";
+
+
+// ===========================================================================
 private var prefs:SharedObject = SharedObject.getLocal("FWConsolePrefs");
 private var consoleLC:LocalConnection = new LocalConnection();
 private var currentCodeEntry:int = 0;
+private var lastLogEntryTime:Number = 0;
 private var isShiftDown:Boolean = false;
+private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
 
   
 // ===========================================================================
@@ -70,6 +91,9 @@ private function main() : void
 	Output.htmlText = prefs.data.savedOutput || "";
 	Output.validateNow();
 	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
+
+	consolePollTimer.addEventListener(TimerEvent.TIMER, onConsolePoll, false, 0, true);
+	consolePollTimer.start();
 	
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
@@ -103,9 +127,9 @@ try {
 	Input.text = "";
 	
 		// serialize the code string to handle quotations, newlines, etc.
-	var result:String = MMExecute('jdlib.FireworksConsole.evaluateCode(' + JSON.serialize(code) + ')');
+	var result:String = callMethod('jdlib.FireworksConsole.evaluateCode', code);
 	
-	print(">>> " + code, result + "\n");
+	print(LogEntryPrefix + " " + code + ":", result + "\n");
 } catch (e:*) {
 //fwlog(e.message);
 }
@@ -127,7 +151,7 @@ private function print(
 		inText = inText.replace(/</g, "&lt;");
 		inText = inText.replace(/>/g, "&gt;");
 		
-		Output.htmlText += '<font color="#585880">' + inPrefix + "</font>: " + inText;
+		Output.htmlText += '<font color="#585880">' + inPrefix + "</font> " + inText;
 	} else {
 			// there's no prefix, so we don't need to deal with html-formatted text
 		Output.text += inText;
@@ -212,12 +236,51 @@ private function initLocalConnection() : void
 
 // ===========================================================================
 public function log(
-	inMessage:String) : void
+	...inArgs) : void
 {
-	if (inMessage && inMessage.length) {
-			// add a newline here, since print just prints whatever it gets
-		print("", inMessage + "\n");
+	print("", inArgs.join(", ") + "\n");
+}
+
+
+// ===========================================================================
+private function printLog() : void
+{
+try {
+	var entriesJSON = MMExecute("console._logEntriesJSON");
+//log("JSON", entriesJSON);
+
+		// the JSON is a series of stringified objects, separated by commas,
+		// not a proper array 
+	var entries = JSON.decode("[" + entriesJSON + "]");
+
+//	var entries = JSON.decode(MMExecute("console._logEntriesJSON"));
+
+// this causes the processing dialog hang
+//	callMethod("console._getEntriesSince", lastLogEntryTime);
+//	var entriesJSON = MMExecute("console._logEntriesJSON");
+//	var entries = JSON.decode(entriesJSON);
+
+	if (entries is Array && entries.length > 0) {
+		for (var i:uint = 0; i < entries.length; i++) {
+			var entry:Object = entries[i];
+
+				// add a : only if we've got the caller's name
+			print(LogEntryPrefix + (entry.caller != "" ? (" " + entry.caller + ": ") : ""),
+				entry.text + "\n");
+
+				// keep track of the most recent entry we've printed, adding 1
+				// so we don't pick up the last entry again
+//			lastLogEntryTime = entry.time + 1;
+		}
+
+		MMExecute("console._logEntriesJSON = '';")
+	} else {
+//		print("", "*** No new console entries ***\n");
 	}
+} catch (e:*) {
+log("printLog error");
+log(e.message);
+}
 }
 
 
@@ -226,6 +289,22 @@ private function loadFCJS() : void
 {
 		// load the embedded JS into FW, since it hasn't been during this session
 	MMExecute((new FireworksConsoleJS()).toString());
+}
+
+
+// ===========================================================================
+private function callMethod(
+	inMethodName:String,
+	...inArgs) : String
+{
+		// strip the [ ] from the JSON version of the inArgs array, since we'll
+		// be using it as method parameters
+	var argString:String = JSON.encode(inArgs).slice(1, -1);
+
+		// include a semi-colon at the end so that the command history steps have them
+	var js:String = inMethodName + "(" + argString + ");";
+
+	return MMExecute(js);
 }
 
 
@@ -287,6 +366,25 @@ private function onDividerRelease(
 		// store the current divider location so we can restore when next loaded
 	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
 	prefs.flush(90);
+}
+
+
+// ===========================================================================
+private function onConsolePoll(
+	inEvent:TimerEvent) : void
+{
+	printLog();
+//	var entries = callMethod("console._getEntriesSince", (new Date()).getTime());
+//
+//	if (entries) {
+//		entries = JSON.decode(entries);
+//
+//		if (entries is Array) {
+//			for (var i:uint = 0; i < entries.length; i++) {
+//				print(entries.caller, entries.text);
+//			}
+//		}
+//	}
 }
 
 
