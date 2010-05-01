@@ -347,10 +347,8 @@ jdlib = jdlib || {};
 	})();
 
 
-	var _logEntries = [];
 	var _counts = {};
 	var _timers = {};
-	var MaxLogEntries = 100;
 
 
 	function _now()
@@ -359,28 +357,17 @@ jdlib = jdlib || {};
 	}
 
 
-	function _print(
-		inType)
+	function _addLogEntry(
+		inType,
+		inCaller)
 	{
-		if (arguments.length < 2) {
+		if (arguments.length < 3) {
 			return;
-		}
-
-		var callingFunction = "";
-		
-		try {
-			callingFunction = arguments.callee.caller.NAME;
-			
-			if (typeof callingFunction == "undefined" || callingFunction == "") {
-				callingFunction = arguments.callee.caller.toString().match(/^function ([^)]+)\(/)[1];
-			}
-		} catch (exception) {
-			callingFunction = "";
 		}
 
 		var s = [];
 		
-		for (var i = 1, len = arguments.length; i < len; i++) {
+		for (var i = 2, len = arguments.length; i < len; i++) {
 			var variant = arguments[i];
 
 			if (typeof variant == "string") {
@@ -392,28 +379,22 @@ jdlib = jdlib || {};
 			}
 		}
 		
-		var entry = {
+		var entryJSON = JSON.stringify({
 			type: inType,
 			text: s.join(" "),
-			caller: callingFunction,
+			caller: inCaller,
 			time: _now()
-		};
-
-		_logEntries.push(entry);
+		});
 
 		if (console._logEntriesJSON.length > 0) {
 			console._logEntriesJSON += ",";
 		}
 
-		console._logEntriesJSON += JSON.stringify(entry);
-//		_logEntries = _logEntries.slice(-MaxLogEntries);
-
-//		console._logEntriesJSON = JSON.stringify(_logEntries);
+		console._logEntriesJSON += entryJSON;
 	}
 
 
 	console = {
-		_logEntries: _logEntries,
 		_logEntriesJSON: "",
 
 			// we need to set this so dojo doesn't wipe out the console object
@@ -449,49 +430,32 @@ jdlib = jdlib || {};
 
 		clear: function()
 		{
-			_logEntries = [];
-		},
-
-		_getEntries: function() 
-		{
-			return _logEntries;
-		},
-		
-		_getEntriesSince: function(
-			inTime)
-		{
-//			inTime = inTime || 0;
-//
-//			var entries = [];
-//			var newestEntry = _logEntries.length;
-//
-//			for (var i = _logEntries.length - 1; i >= 0; i--) {
-//				if (_logEntries[i].time < inTime) {
-//						// this entry is older than what the caller asked for
-//					break;
-//				} else {
-//					newestEntry = i;
-//				}
-//			}
-//
-//			if (newestEntry < _logEntries.length) {
-//				entries = _logEntries.slice(newestEntry);
-//			}
-//
-				// we have to use a proper JSON stringifier because the parser
-				// on the AS side is picky
-// for some reason, calling this here, even without returning the result, causes
-// the modal processing dialog to appear. but it seems to work in JSON Panel
-			console._logEntriesJSON = JSON.stringify(_logEntries);
-			_logEntries = [];
-//			return JSON.stringify(entries);
+			_logEntriesJSON = "";
 		}
 	};
 
-		// create functions that pass different types to _print
+		// create functions that pass different types to _addLogEntry
 	for (var functionName in { log:1, warn:1, info:1, debug:1, error:1 }) {
 		console[functionName] = (function(inFunctionName) {
-			return function() { _print.apply(this, [inFunctionName].concat(arguments)); };
+			return function()
+				{
+						// we have to capture the calling function's name here,
+						// rather than in _addLogEntry, since that function sees
+						// its caller as apply()
+					var callingFunction = "";
+
+					try {
+						callingFunction = arguments.callee.caller.NAME;
+
+						if (typeof callingFunction == "undefined" || callingFunction == "") {
+							callingFunction = arguments.callee.caller.toString().match(/^\s*function ([^)]+)\(/)[1];
+						}
+					} catch (exception) {
+						callingFunction = "";
+					}
+					
+					_addLogEntry.apply(this, [inFunctionName, callingFunction].concat(arguments));
+				};
 		})(functionName);
 	}
 

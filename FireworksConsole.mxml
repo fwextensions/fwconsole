@@ -17,15 +17,16 @@
 	width="100%"
 	height="100%"
 	horizontalAlign="left"	
+	preinitialize="onPreinitialize()"
 	applicationComplete="main()" 
 >
 	<mx:Script source="FireworksConsoleMain.as" />
 	
 	<mx:ApplicationControlBar 
 		dock="true" 
-		paddingTop="4" 
+		paddingTop="5"
 		paddingRight="4" 
-		paddingBottom="4"
+		paddingBottom="2"
 		paddingLeft="4"
 	>
 		<mx:Button 
@@ -43,6 +44,12 @@
 			label="Print .jsf Console"
 			toolTip="Print recent calls to console.log()"
 			click="printLog();"
+		/>
+		<mx:CheckBox id="PollConsole"
+			label="Auto"
+			selected="true"
+			toolTip="Poll console.log()"
+			click="togglePolling()"
 		/>
 	</mx:ApplicationControlBar>
 

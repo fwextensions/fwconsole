@@ -19,7 +19,11 @@
 
 		- provide option to poll or not
 
-		- don't poll if text tool is active? 
+		- don't poll if text tool is active?
+
+		- don't poll while FW is in background
+
+		- track poll setting across sessions
 
 		- provide console.log() for JS
 			stores each log entry in an array
@@ -65,6 +69,16 @@ import com.adobe.serialization.json.*;
 private const ConsolePollInterval:uint = 3000;
 private const LogEntryPrefix:String = ">>>";
 
+private const SupportedFWEvents:Object = {
+	onFwApplicationActivate: 1,
+	onFwApplicationDeactivate: 1,
+
+		// this undocumented event is crucial for getting the current tool name
+		// without calling fw.activeTool.  the tool name is the first parameter
+		// to the handler.
+	setfwActiveToolForSWFs: 1
+};
+
 
 // ===========================================================================
 private var prefs:SharedObject = SharedObject.getLocal("FWConsolePrefs");
@@ -73,8 +87,59 @@ private var currentCodeEntry:int = 0;
 private var lastLogEntryTime:Number = 0;
 private var isShiftDown:Boolean = false;
 private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
+private var currentTool:String = "";
+private var preinitialized:Boolean = false;
+private var logs:Array = [];
 
   
+// ===========================================================================
+private function onPreinitialize() : void
+{
+try {
+		// we need to register these callbacks early in the startup process.
+		// registering them from applicationComplete is too late.
+//	if (ExternalInterface.available) {
+//preinitialized = true;
+//		ExternalInterface.addCallback("IsFwCallbackInstalled",
+//			onIsFwCallbackInstalled);
+//
+//			// create a handler for all the supported events
+//		for (var eventName in SupportedFWEvents) {
+//logs.push(eventName);
+//			ExternalInterface.addCallback(eventName,
+//				createFWEventHandler(eventName));
+//		}
+//	}
+
+		// we need to register these callbacks early in the startup process.
+		// registering them from applicationComplete is too late.
+	if (ExternalInterface.available) {
+		ExternalInterface.addCallback("IsFwCallbackInstalled",
+			function(inFunctionName:String) : Boolean
+			{
+logs.push(inFunctionName);
+//				return true;
+				return (inFunctionName == "setfwActiveToolForSWFs");
+			}
+		);
+
+			// create a handler for getting the active tool when it changes
+		ExternalInterface.addCallback("setfwActiveToolForSWFs",
+			function(inToolName:String)
+			{
+log("setfwActiveToolForSWFs", inToolName);
+				currentTool = inToolName;
+			}
+		);
+	}
+} catch (e:*) {
+//fwlog(e.message);
+logs.push("ERROR");
+logs.push(e.message);
+}
+}
+
+
 // ===========================================================================
 private function main() : void 
 {
@@ -109,6 +174,8 @@ private function main() : void
 	initLocalConnection();
 	
 	loadFCJS();
+
+print("", logs.join("\n"));
 //	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
 }
 
@@ -217,6 +284,17 @@ private function showNextCodeEntry() : void
 
 
 // ===========================================================================
+private function togglePolling() : void
+{
+	if (PollConsole.selected) {
+		consolePollTimer.start();
+	} else {
+		consolePollTimer.stop();
+	}
+}
+
+
+// ===========================================================================
 private function clearOutput() : void
 {
 	Output.text = "";
@@ -245,42 +323,33 @@ public function log(
 // ===========================================================================
 private function printLog() : void
 {
-try {
-	var entriesJSON = MMExecute("console._logEntriesJSON");
-//log("JSON", entriesJSON);
+	try {
+			// we can't call a method and have it stringify the log entries at
+			// that time, so the console JS code has to build up the JSON string
+			// as it goes.  so just access it as an attribute, not a method call.
+		var entriesJSON = MMExecute("console._logEntriesJSON");
 
-		// the JSON is a series of stringified objects, separated by commas,
-		// not a proper array 
-	var entries = JSON.decode("[" + entriesJSON + "]");
+			// the JSON is a series of stringified objects, separated by commas,
+			// not a proper JSON array, so add the brackets before decoding
+		var entries = JSON.decode("[" + entriesJSON + "]");
 
-//	var entries = JSON.decode(MMExecute("console._logEntriesJSON"));
+		if (entries is Array && entries.length > 0) {
+			for (var i:uint = 0; i < entries.length; i++) {
+				var entry:Object = entries[i];
 
-// this causes the processing dialog hang
-//	callMethod("console._getEntriesSince", lastLogEntryTime);
-//	var entriesJSON = MMExecute("console._logEntriesJSON");
-//	var entries = JSON.decode(entriesJSON);
+					// add a : only if we've got the caller's name
+				print(LogEntryPrefix + (entry.caller != "" ? (" " + entry.caller + "():") : ""),
+					entry.text + "\n");
+			}
 
-	if (entries is Array && entries.length > 0) {
-		for (var i:uint = 0; i < entries.length; i++) {
-			var entry:Object = entries[i];
-
-				// add a : only if we've got the caller's name
-			print(LogEntryPrefix + (entry.caller != "" ? (" " + entry.caller + ": ") : ""),
-				entry.text + "\n");
-
-				// keep track of the most recent entry we've printed, adding 1
-				// so we don't pick up the last entry again
-//			lastLogEntryTime = entry.time + 1;
+				// clear the entries, now that we've displayed them
+			MMExecute("console._logEntriesJSON = '';")
+		} else {
+	//		print("", "*** No new console entries ***\n");
 		}
-
-		MMExecute("console._logEntriesJSON = '';")
-	} else {
-//		print("", "*** No new console entries ***\n");
+	} catch (e:*) {
+		log("printLog error", e.message);
 	}
-} catch (e:*) {
-log("printLog error");
-log(e.message);
-}
 }
 
 
@@ -305,6 +374,40 @@ private function callMethod(
 	var js:String = inMethodName + "(" + argString + ");";
 
 	return MMExecute(js);
+}
+
+
+// ===========================================================================
+private function createFWEventHandler(
+	inEventName:String) : Function
+{
+	if (inEventName == "setfwActiveToolForSWFs") {
+			// create a special handler for this event that stores the current
+			// tool name, so we can check it in onAppJSEvent and ignore events
+			// during text editing.  we have to use a special handler because
+			// this is the only FW event that gets called with a parameter.  we
+			// don't need to call onAppJSEvent from here because the JS side
+			// shouldn't need to listen to this event.  it can just listen for
+			// onFwActiveToolChange and then check fw.activeTool.
+		return function(
+				inToolName)
+			{
+				currentTool = inToolName;
+log("method", inEventName, inToolName);
+			};
+	} else {
+		return function()
+			{
+log("method", inEventName);
+
+//					// only pass the event to the panel if it's actually listening
+//					// for it, to avoid the overhead of passing data to the JS side.
+//					// switching documents triggers 4 events, so they can add up.
+//				if (inEventName in registeredFWEvents) {
+//					onAppJSEvent({ type: inEventName });
+//				}
+			};
+	}
 }
 
 
@@ -373,18 +476,19 @@ private function onDividerRelease(
 private function onConsolePoll(
 	inEvent:TimerEvent) : void
 {
-	printLog();
-//	var entries = callMethod("console._getEntriesSince", (new Date()).getTime());
-//
-//	if (entries) {
-//		entries = JSON.decode(entries);
-//
-//		if (entries is Array) {
-//			for (var i:uint = 0; i < entries.length; i++) {
-//				print(entries.caller, entries.text);
-//			}
-//		}
-//	}
+	if (currentTool != "Text") {
+		printLog();
+	} else {
+log(preinitialized, "currentTool", currentTool);
+	}
+}
+
+
+// ===========================================================================
+private function onIsFwCallbackInstalled(
+	inFunctionName:String) : Boolean
+{
+	return (inFunctionName in SupportedFWEvents);
 }
 
 
