@@ -17,6 +17,7 @@
 	To do:
 		- support %s in first string passed to console.log, etc.
 
+	Done:
 		- add console.log() API
 */
 
@@ -386,7 +387,11 @@ jdlib = jdlib || {};
 			time: _now()
 		});
 
-		if (console._logEntriesJSON.length > 0) {
+		if (console._logEntriesJSON.length > 75000) {
+				// the console isn't running and picking up these log entries, so
+				// clear the entries to keep them from growing too long
+			console._logEntriesJSON = "";
+		} else if (console._logEntriesJSON.length > 0) {
 			console._logEntriesJSON += ",";
 		}
 
@@ -426,6 +431,12 @@ jdlib = jdlib || {};
 
 			_counts[inCountName]++;
 			console.log(inCountName + ":", _counts[inCountName]);
+		},
+
+		countReset: function(
+			inCountName)
+		{
+			delete _counts[inCountName];
 		},
 
 		clear: function()

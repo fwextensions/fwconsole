@@ -4,11 +4,11 @@
 	File: Fireworks Console.mxml
 
 	Author - John Dunning
-	Copyright - 2007 John Dunning.  All rights reserved.
+	Copyright - 2010 John Dunning.  All rights reserved.
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.2.0 ($Revision$)
+	Release - 0.3.0 ($Revision$)
 	Last update - $Date$
 -->
 
@@ -41,14 +41,14 @@
 		/>
 		<mx:Spacer width="100%" />
 		<mx:Button
-			label="Print .jsf Console"
+			label="Print .jsf Logs"
 			toolTip="Print recent calls to console.log()"
-			click="printLog();"
+			click="printLog(true);"
 		/>
 		<mx:CheckBox id="PollConsole"
 			label="Auto"
 			selected="true"
-			toolTip="Poll console.log()"
+			toolTip="Print recent calls to console.log() automatically"
 			click="togglePolling()"
 		/>
 	</mx:ApplicationControlBar>

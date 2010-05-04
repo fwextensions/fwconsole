@@ -17,13 +17,21 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
+		- track poll setting across sessions
+
+		- remember the divider size as a percentage, and restore based on the
+			current height of the 
+
+		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
+
+	Done:
+		- remember max number of code entries?
+
 		- provide option to poll or not
 
 		- don't poll if text tool is active?
 
 		- don't poll while FW is in background
-
-		- track poll setting across sessions
 
 		- provide console.log() for JS
 			stores each log entry in an array
@@ -40,14 +48,6 @@
 			"groupEnd", "info", "log", "profile", "profileEnd", "time",
 			"timeEnd", "trace", "warn"
 
-		- remember the divider size as a percentage, and restore based on the
-			current height of the 
-
-		- remember max number of code entries? 
-		
-		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
-
-	Done:
 		- remember and restore state of divider
 */
 
@@ -66,7 +66,7 @@ import com.adobe.serialization.json.*;
 
 
 // ===========================================================================
-private const ConsolePollInterval:uint = 3000;
+private const ConsolePollInterval:uint = 2000;
 private const LogEntryPrefix:String = ">>>";
 
 private const SupportedFWEvents:Object = {
@@ -88,7 +88,7 @@ private var lastLogEntryTime:Number = 0;
 private var isShiftDown:Boolean = false;
 private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
 private var currentTool:String = "";
-private var preinitialized:Boolean = false;
+private var consolePollingEnabled:Boolean = true;
 private var logs:Array = [];
 
   
@@ -98,42 +98,40 @@ private function onPreinitialize() : void
 try {
 		// we need to register these callbacks early in the startup process.
 		// registering them from applicationComplete is too late.
-//	if (ExternalInterface.available) {
-//preinitialized = true;
-//		ExternalInterface.addCallback("IsFwCallbackInstalled",
-//			onIsFwCallbackInstalled);
-//
-//			// create a handler for all the supported events
-//		for (var eventName in SupportedFWEvents) {
-//logs.push(eventName);
-//			ExternalInterface.addCallback(eventName,
-//				createFWEventHandler(eventName));
-//		}
-//	}
-
-		// we need to register these callbacks early in the startup process.
-		// registering them from applicationComplete is too late.
 	if (ExternalInterface.available) {
 		ExternalInterface.addCallback("IsFwCallbackInstalled",
-			function(inFunctionName:String) : Boolean
-			{
-logs.push(inFunctionName);
-//				return true;
-				return (inFunctionName == "setfwActiveToolForSWFs");
-			}
-		);
+			onIsFwCallbackInstalled);
 
 			// create a handler for getting the active tool when it changes
 		ExternalInterface.addCallback("setfwActiveToolForSWFs",
 			function(inToolName:String)
 			{
-log("setfwActiveToolForSWFs", inToolName);
+//log("setfwActiveToolForSWFs", inToolName);
 				currentTool = inToolName;
+			}
+		);
+
+		ExternalInterface.addCallback("onFwApplicationActivate",
+			function()
+			{
+//log("onFwApplicationActivate");
+					// restart polling, now that we're in the foreground
+				if (consolePollingEnabled) {
+					consolePollTimer.start();
+				}
+			}
+		);
+
+		ExternalInterface.addCallback("onFwApplicationDeactivate",
+			function()
+			{
+//log("onFwApplicationDeactivate");
+					// stop polling while in the background
+				consolePollTimer.stop();
 			}
 		);
 	}
 } catch (e:*) {
-//fwlog(e.message);
 logs.push("ERROR");
 logs.push(e.message);
 }
@@ -175,8 +173,18 @@ private function main() : void
 	
 	loadFCJS();
 
-print("", logs.join("\n"));
+//print("", logs.join("\n"));
 //	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
+}
+
+
+// ===========================================================================
+private function initLocalConnection() : void
+{
+		// the main app object implements the functions that can be called by
+		// the LocalConnection (log)
+	consoleLC.client = this;
+	consoleLC.connect("FireworksConsole");
 }
 
 
@@ -284,17 +292,6 @@ private function showNextCodeEntry() : void
 
 
 // ===========================================================================
-private function togglePolling() : void
-{
-	if (PollConsole.selected) {
-		consolePollTimer.start();
-	} else {
-		consolePollTimer.stop();
-	}
-}
-
-
-// ===========================================================================
 private function clearOutput() : void
 {
 	Output.text = "";
@@ -303,12 +300,15 @@ private function clearOutput() : void
 
 
 // ===========================================================================
-private function initLocalConnection() : void
+private function togglePolling() : void
 {
-		// the main app object implements the functions that can be called by
-		// the LocalConnection (log)
-	consoleLC.client = this;
-	consoleLC.connect("FireworksConsole");
+	consolePollingEnabled = PollConsole.selected;
+
+	if (consolePollingEnabled) {
+		consolePollTimer.start();
+	} else {
+		consolePollTimer.stop();
+	}
 }
 
 
@@ -321,7 +321,8 @@ public function log(
 
 
 // ===========================================================================
-private function printLog() : void
+private function printLog(
+	inWarnIfNoEntries:Boolean = false) : void
 {
 	try {
 			// we can't call a method and have it stringify the log entries at
@@ -344,8 +345,10 @@ private function printLog() : void
 
 				// clear the entries, now that we've displayed them
 			MMExecute("console._logEntriesJSON = '';")
-		} else {
-	//		print("", "*** No new console entries ***\n");
+		} else if (inWarnIfNoEntries) {
+				// we want to show this only if the user clicked the Print
+				// button, not when simply polling for new entries
+			print("", "*** No new console log entries ***\n");
 		}
 	} catch (e:*) {
 		log("printLog error", e.message);
@@ -374,40 +377,6 @@ private function callMethod(
 	var js:String = inMethodName + "(" + argString + ");";
 
 	return MMExecute(js);
-}
-
-
-// ===========================================================================
-private function createFWEventHandler(
-	inEventName:String) : Function
-{
-	if (inEventName == "setfwActiveToolForSWFs") {
-			// create a special handler for this event that stores the current
-			// tool name, so we can check it in onAppJSEvent and ignore events
-			// during text editing.  we have to use a special handler because
-			// this is the only FW event that gets called with a parameter.  we
-			// don't need to call onAppJSEvent from here because the JS side
-			// shouldn't need to listen to this event.  it can just listen for
-			// onFwActiveToolChange and then check fw.activeTool.
-		return function(
-				inToolName)
-			{
-				currentTool = inToolName;
-log("method", inEventName, inToolName);
-			};
-	} else {
-		return function()
-			{
-log("method", inEventName);
-
-//					// only pass the event to the panel if it's actually listening
-//					// for it, to avoid the overhead of passing data to the JS side.
-//					// switching documents triggers 4 events, so they can add up.
-//				if (inEventName in registeredFWEvents) {
-//					onAppJSEvent({ type: inEventName });
-//				}
-			};
-	}
 }
 
 
@@ -476,10 +445,12 @@ private function onDividerRelease(
 private function onConsolePoll(
 	inEvent:TimerEvent) : void
 {
+		// don't poll if the user has the text tool selected, because if they're
+		// editing text, polling can cancel the edit mode
 	if (currentTool != "Text") {
 		printLog();
-	} else {
-log(preinitialized, "currentTool", currentTool);
+//	} else {
+//log("currentTool", currentTool);
 	}
 }
 
@@ -504,7 +475,6 @@ private function onError(
 private function onExit(
 	inEvent:FlexEvent) : void
 {
-//fwlog("exit");
 	prefs.data.savedOutput = Output.text;
 	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
 	prefs.flush(90);
