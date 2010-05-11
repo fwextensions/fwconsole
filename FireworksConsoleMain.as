@@ -3,11 +3,11 @@
 	File: FireworksConsoleMain.as
 
 	Author - John Dunning
-	Copyright - 2007 John Dunning.  All rights reserved.
+	Copyright - 2010 John Dunning.  All rights reserved.
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.2.0 ($Revision$)
+	Release - 0.3.1 ($Revision$)
 	Last update - $Date$
 
    ======================================================================== */
@@ -17,14 +17,24 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
-		- track poll setting across sessions
+		- doing sel[0] on a RectanglePrimitive in CS5 returns a negative error
+			works in earlier versions? 
+
+		- support multiple console methods in AS, warn, error, etc., like in JS
 
 		- remember the divider size as a percentage, and restore based on the
-			current height of the 
+			current height of the
+
+		- support filtering messages by type?
 
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
 
 	Done:
+		- track poll setting across sessions
+
+		- fix polling.  doesn't seem to be getting the tool changes, so it
+			prevents usage of scale tool, text, etc.
+
 		- remember max number of code entries?
 
 		- provide option to poll or not
@@ -73,11 +83,22 @@ private const SupportedFWEvents:Object = {
 	onFwApplicationActivate: 1,
 	onFwApplicationDeactivate: 1,
 
+		// if we want to get called on setfwActiveToolForSWFs, then we have to
+		// tell FW that we also want these events.  otherwise, it doesn't seem
+		// to call setfwActiveToolForSWFs.
+	onFwActiveToolChange: 1,
+	onFwActiveToolParamsChange: 1,
+
 		// this undocumented event is crucial for getting the current tool name
 		// without calling fw.activeTool.  the tool name is the first parameter
 		// to the handler.
 	setfwActiveToolForSWFs: 1
 };
+
+
+// ===========================================================================
+[Bindable]
+private var consolePollingEnabled:Boolean = true;
 
 
 // ===========================================================================
@@ -88,7 +109,6 @@ private var lastLogEntryTime:Number = 0;
 private var isShiftDown:Boolean = false;
 private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
 private var currentTool:String = "";
-private var consolePollingEnabled:Boolean = true;
 private var logs:Array = [];
 
   
@@ -154,9 +174,6 @@ private function main() : void
 	Output.htmlText = prefs.data.savedOutput || "";
 	Output.validateNow();
 	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
-
-	consolePollTimer.addEventListener(TimerEvent.TIMER, onConsolePoll, false, 0, true);
-	consolePollTimer.start();
 	
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
@@ -167,6 +184,19 @@ private function main() : void
 		// default to a height of 50 for the 
 	prefs.data.dividerY = prefs.data.dividerY || 50;
 	IOContainer.getDividerAt(0).y = prefs.data.dividerY;
+
+	if (typeof prefs.data.enablePolling != "boolean") {
+			// turn polling on by default
+		prefs.data.enablePolling = true;
+	}
+
+	consolePollingEnabled = prefs.data.enablePolling;
+
+	consolePollTimer.addEventListener(TimerEvent.TIMER, onConsolePoll, false, 0, true);
+
+	if (consolePollingEnabled) {
+		consolePollTimer.start();
+	}
 
 		// make console.log() available to other panels
 	initLocalConnection();
@@ -303,6 +333,10 @@ private function clearOutput() : void
 private function togglePolling() : void
 {
 	consolePollingEnabled = PollConsole.selected;
+
+		// we have to update the prefs now, otherwise this change won't stick
+	prefs.data.enablePolling = consolePollingEnabled;
+	prefs.flush(90);
 
 	if (consolePollingEnabled) {
 		consolePollTimer.start();
@@ -445,12 +479,21 @@ private function onDividerRelease(
 private function onConsolePoll(
 	inEvent:TimerEvent) : void
 {
-		// don't poll if the user has the text tool selected, because if they're
-		// editing text, polling can cancel the edit mode
-	if (currentTool != "Text") {
-		printLog();
-//	} else {
-//log("currentTool", currentTool);
+		// don't poll if the user has any of these tools selected, because if
+		// they're editing text, scaling the selection, etc., then polling will
+		// cancel the edit mode
+	switch (currentTool) {
+		case "Text":
+		case "Scale":
+		case "Skew":
+		case "Distort":
+		case "9-slice Scale":
+		case "Crop":
+			break;
+
+		default:
+			printLog();
+			break;
 	}
 }
 
@@ -475,7 +518,9 @@ private function onError(
 private function onExit(
 	inEvent:FlexEvent) : void
 {
+// this handler never seems to get called before the panel is closed 
 	prefs.data.savedOutput = Output.text;
 	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
+	prefs.data.enablePolling = consolePollingEnabled;
 	prefs.flush(90);
 }

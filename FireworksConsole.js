@@ -3,11 +3,11 @@
 	File: FireworksConsole.js
 
 	Author - John Dunning
-	Copyright - 2007 John Dunning.  All rights reserved.
+	Copyright - 2010 John Dunning.  All rights reserved.
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.2.0 ($Revision$)
+	Release - 0.3.0 ($Revision$)
 	Last update - $Date$
 
    ======================================================================== */
@@ -16,6 +16,9 @@
 /*
 	To do:
 		- support %s in first string passed to console.log, etc.
+
+		- support assert() methods
+			would have to assert the expresion in the caller's context
 
 	Done:
 		- add console.log() API

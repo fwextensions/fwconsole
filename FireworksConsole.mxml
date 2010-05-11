@@ -8,7 +8,7 @@
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.3.0 ($Revision$)
+	Release - 0.3.1 ($Revision$)
 	Last update - $Date$
 -->
 
@@ -47,7 +47,7 @@
 		/>
 		<mx:CheckBox id="PollConsole"
 			label="Auto"
-			selected="true"
+			selected="{consolePollingEnabled}"
 			toolTip="Print recent calls to console.log() automatically"
 			click="togglePolling()"
 		/>
