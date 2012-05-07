@@ -7,8 +7,8 @@
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.3.1 ($Revision$)
-	Last update - $Date$
+	Release - 0.3.1 ($Revision: 1.10 $)
+	Last update - $Date: 2010/05/11 19:42:17 $
 
    ======================================================================== */
 
@@ -17,8 +17,26 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
-		- doing sel[0] on a RectanglePrimitive in CS5 returns a negative error
-			works in earlier versions? 
+		- doesn't seem to track the activeTool anymore 
+
+		- evaluating code doesn't work when no doc is open
+
+		- don't show the printLog error if MMExecute is failing 
+
+		- support "el" variable for fw.selection[0]
+
+		- move evaluateCode to the console object instead of jdlib.FireworksConsole
+
+		- eval function in with ({}) { } so that creating variables doesn't
+			pollute the global namespace? 
+
+		- toggle for return evaluating the code
+
+		- show error and warning entries in different color
+
+		- limit how much console history is saved, to avoid hanging FW
+
+		- stop polling when panel is hidden
 
 		- support multiple console methods in AS, warn, error, etc., like in JS
 
@@ -30,6 +48,18 @@
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
 
 	Done:
+		- doing sel[0] on a RectanglePrimitive in CS5 returns a negative error
+			works in earlier versions? 
+
+		- clean up UI, use standard grey colors
+
+		- returning the log JSON from a method call seems to cause the processing
+			dialog to appear
+
+		- make pressing esc when focus is in the output field work
+
+		- listen for esc key and return focus to document when pressed
+
 		- track poll setting across sessions
 
 		- fix polling.  doesn't seem to be getting the tool changes, so it
@@ -70,6 +100,7 @@ import mx.controls.Alert;
 import mx.events.*;
 import adobe.utils.*;
 import com.adobe.serialization.json.*;
+import com.flexer.Debug;
 
 
 //include "assets/fwlog.as";
@@ -126,7 +157,7 @@ try {
 		ExternalInterface.addCallback("setfwActiveToolForSWFs",
 			function(inToolName:String)
 			{
-//log("setfwActiveToolForSWFs", inToolName);
+log("setfwActiveToolForSWFs", inToolName);
 				currentTool = inToolName;
 			}
 		);
@@ -167,7 +198,6 @@ private function main() : void
 	Output = Output;
 	
 	Input.addEventListener(KeyboardEvent.KEY_DOWN, onInputKeyDown, true, 0, true);
-	Input.addEventListener(KeyboardEvent.KEY_UP, onInputKeyUp, true, 0, true);
 	Input.addEventListener(TextEvent.TEXT_INPUT, onTextInput, false, 0, true);
 	Input.setFocus();
 
@@ -178,6 +208,7 @@ private function main() : void
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
 	
+	stage.addEventListener(KeyboardEvent.KEY_DOWN, onStageKeyDown, false, 0, true);
 	stage.addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
 	stage.addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
 
@@ -202,6 +233,8 @@ private function main() : void
 	initLocalConnection();
 	
 	loadFCJS();
+log("Input", Debug.dump({ foo: 42 }));
+//log("Input", JSON.encode(Input));
 
 //print("", logs.join("\n"));
 //	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
@@ -232,11 +265,12 @@ try {
 	Input.text = "";
 	
 		// serialize the code string to handle quotations, newlines, etc.
-	var result:String = callMethod('jdlib.FireworksConsole.evaluateCode', code);
+	var result:String = callMethod('console.evaluate', code);
+//	var result:String = callMethod('jdlib.FireworksConsole.evaluateCode', code);
 	
 	print(LogEntryPrefix + " " + code + ":", result + "\n");
 } catch (e:*) {
-//fwlog(e.message);
+log("eval error", e.message);
 }
 }
 
@@ -326,6 +360,9 @@ private function clearOutput() : void
 {
 	Output.text = "";
 	prefs.data.savedOutput = "";
+
+		// switch the focus from the button back to the doc
+	callMethod("fw.moveFocusToDoc");
 }
 
 
@@ -359,14 +396,23 @@ private function printLog(
 	inWarnIfNoEntries:Boolean = false) : void
 {
 	try {
-			// we can't call a method and have it stringify the log entries at
-			// that time, so the console JS code has to build up the JSON string
-			// as it goes.  so just access it as an attribute, not a method call.
-		var entriesJSON = MMExecute("console._logEntriesJSON");
+		var clearLog = MMExecute("console._clearLog");
 
-			// the JSON is a series of stringified objects, separated by commas,
-			// not a proper JSON array, so add the brackets before decoding
-		var entries = JSON.decode("[" + entriesJSON + "]");
+		if (JSON.decode(clearLog)) {
+				// the user has called console.clear(), so clear our log display
+				// and bail
+			clearOutput();
+			MMExecute("console._clearLog = false;");
+			return;
+		}
+		
+			// get the log entries as a JSON string and delete the string, since
+			// the console methods can't return anything without triggering the
+			// motherfucking modal processing command dialog.  then convert the
+			// JSON entires to an array.
+		var entriesJSON = MMExecute("console._prepLogEntriesJSON(); console._logEntriesJSON");
+		MMExecute('console._logEntriesJSON = ""');
+		var entries = JSON.decode(entriesJSON);
 
 		if (entries is Array && entries.length > 0) {
 			for (var i:uint = 0; i < entries.length; i++) {
@@ -376,16 +422,16 @@ private function printLog(
 				print(LogEntryPrefix + (entry.caller != "" ? (" " + entry.caller + "():") : ""),
 					entry.text + "\n");
 			}
-
-				// clear the entries, now that we've displayed them
-			MMExecute("console._logEntriesJSON = '';")
 		} else if (inWarnIfNoEntries) {
 				// we want to show this only if the user clicked the Print
 				// button, not when simply polling for new entries
 			print("", "*** No new console log entries ***\n");
+
+				// switch the focus from the Print button back to the doc
+			callMethod("fw.moveFocusToDoc");
 		}
 	} catch (e:*) {
-		log("printLog error", e.message);
+		log("printLog error", e.message, entriesJSON);
 	}
 }
 
@@ -411,6 +457,18 @@ private function callMethod(
 	var js:String = inMethodName + "(" + argString + ");";
 
 	return MMExecute(js);
+}
+
+
+// ===========================================================================
+private function onHistoryItemClick(
+	inEvent:ItemClickEvent) : void
+{
+	if (inEvent.index == 0) {
+		showPreviousCodeEntry();
+	} else {
+		showNextCodeEntry();
+	}
 }
 
 
@@ -456,12 +514,17 @@ private function onInputKeyDown(
 
 
 // ===========================================================================
-private function onInputKeyUp(
+private function onStageKeyDown(
 	inEvent:KeyboardEvent) : void
 {
 		// track whether the shift key is up so we can check its state in
 		// onTextInput
 	isShiftDown = inEvent.shiftKey;
+
+	if (inEvent.keyCode == Keyboard.ESCAPE) {
+			// wherever esc is pressed, move focus back to the FW document
+		callMethod("fw.moveFocusToDoc");
+	}
 }
 
 
@@ -479,6 +542,7 @@ private function onDividerRelease(
 private function onConsolePoll(
 	inEvent:TimerEvent) : void
 {
+//log("onConsolePoll", currentTool);	
 		// don't poll if the user has any of these tools selected, because if
 		// they're editing text, scaling the selection, etc., then polling will
 		// cancel the edit mode

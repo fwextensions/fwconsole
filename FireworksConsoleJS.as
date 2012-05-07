@@ -7,8 +7,8 @@
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.2.0 ($Revision$)
-	Last update - $Date$
+	Release - 0.2.0 ($Revision: 1.1 $)
+	Last update - $Date: 2007/12/02 00:23:06 $
 
    ======================================================================== */
 

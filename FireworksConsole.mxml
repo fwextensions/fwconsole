@@ -8,30 +8,38 @@
 	Email - fw@johndunning.com
 	Website - http://johndunning.com/fireworks
 
-	Release - 0.3.1 ($Revision$)
-	Last update - $Date$
+	Release - 0.3.1 ($Revision: 1.8 $)
+	Last update - $Date: 2010/05/11 19:42:17 $
 -->
 
-<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" 
+<mx:Application
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	usePreloader="false"
 	layout="absolute"
 	width="100%"
 	height="100%"
 	horizontalAlign="left"	
+	backgroundGradientColors="[0xeeeeee, 0xd6d6d6]"
+	backgroundColor="0xd6d6d6"
 	preinitialize="onPreinitialize()"
 	applicationComplete="main()" 
 >
+	<mx:Style source="assets/ConsoleStyles.css"/>
 	<mx:Script source="FireworksConsoleMain.as" />
 	
 	<mx:ApplicationControlBar 
 		dock="true" 
 		paddingTop="5"
 		paddingRight="4" 
-		paddingBottom="2"
-		paddingLeft="4"
+		paddingBottom="4"
+		paddingLeft="5"
+		horizontalGap="5"
+		fillAlphas="[0.45,0]"
+		dropShadowEnabled="false"
 	>
 		<mx:Button 
 			label="Eval"
-			toolTip="Evaluate the entered JavaScript" 
+			toolTip="Evaluate the JavaScript entered below"
 			click="evaluateCode();"
 		/>
 		<mx:Button 
@@ -39,6 +47,19 @@
 			toolTip="Clear the history area" 
 			click="clearOutput();"
 		/>
+        <mx:ButtonBar
+			itemClick="onHistoryItemClick(event)"
+			paddingLeft="0"
+			paddingRight="0"
+			buttonWidth="20"
+		>
+            <mx:dataProvider>
+                <mx:Array>
+                    <mx:Object toolTip="Show previous code entry (ctrl-up-arrow)" icon="@Embed('assets/previous-icon.png')" />
+                    <mx:Object toolTip="Show next code entry (ctrl-down-arrow)" icon="@Embed('assets/next-icon.png')" />
+                </mx:Array>
+            </mx:dataProvider>
+        </mx:ButtonBar>
 		<mx:Spacer width="100%" />
 		<mx:Button
 			label="Print .jsf Logs"
@@ -55,7 +76,6 @@
 
 	<mx:VDividedBox id="IOContainer"
 		liveDragging="true"
-		backgroundColor="0xDADEE3"
 		width="100%"
 		height="100%"
 		paddingTop="10"
