@@ -1,0 +1,55 @@
+/* ===========================================================================
+	
+	File: QFStyles.css
+
+	Author - John Dunning
+	Copyright - 2009 John Dunning.  All rights reserved.
+	Email - fw@johndunning.com
+	Website - http://johndunning.com/fireworks
+
+	Release - 0.4.0 ($Revision: 1.2 $)
+	Last update - $Date: 2009/05/27 17:57:12 $
+
+   ======================================================================== */
+
+/*
+global {
+   themeColor: 			#9e9e9e;
+   color: 				#333333;
+   fontFamily: 			Tahoma;
+   fontSize:			11;
+}
+
+ApplicationControlBar {
+   highlightAlphas: 	0.03, 0;
+   fillAlphas: 			1, 1;
+   fillColors: 			#5c5c5c, #3e3e3e;
+   shadowDistance: 		2;
+}
+
+Application {
+	borderStyle:		"none";
+	backgroundColor:	#2D374A;
+	backgroundImage:	"";
+	horizontalAlign:	"center";
+}
+*/
+
+TextArea
+{
+	fontFamily:			"Courier New";
+	fontSize:			12;
+}
+
+Button {
+	paddingLeft:		5;
+	paddingRight:		5;
+/*
+   highlightAlphas: 	0.36, 0;
+   fillAlphas: 			1, 0.55, 1, 0.7;
+   fillColors: 			#333333, #000000, #666666, #666666;
+   color: 				#dddddd;
+   textRollOverColor: 	#ffffff;
+   borderColor: 		#666666;
+*/
+}
