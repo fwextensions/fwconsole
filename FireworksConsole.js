@@ -735,6 +735,7 @@ jdlib = jdlib || {};
 		_clearLog: false,
 		
 		
+			// track the objects and the properties that are being watched
 		_watches: [],
 
 
@@ -835,9 +836,13 @@ jdlib = jdlib || {};
 
 		watch: function(
 			inObject,
-			inProperty,
+			inProperties,
 			inObjectName)
 		{
+				// turn inProperties into an array if it's just a single string
+				// so we can run it through forEach below
+			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
+			
 			var objectName = inObjectName ? (inObjectName + ".") : "",
 					// annoyingly, callbacks used for watching don't seem to
 					// have any closure scope at all.  they can only access 
@@ -848,13 +853,16 @@ jdlib = jdlib || {};
 					'log(' + objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' + 
 					'return inNewValue;'
 				);
-				
-			this._watches.push({
-				object: inObject,
-				property: inProperty
-			});
-			
-			inObject.watch(inProperty, callback);
+					
+			_.forEach(inProperties, function(property) {
+					// remember the watched object so we can unwatch it
+				this._watches.push({
+					object: inObject,
+					property: property
+				});
+
+				inObject.watch(property, callback);
+			}, this);
 		},
 		
 		
