@@ -15,15 +15,10 @@
 
 /*
 	To do:
-		- add console.watch()
-			console.watch([[o, "foo"], [o, "bar"])
-			console.watch([[o, ["foo", "bar]], [p, "baz"])
-			maybe pass in a func callback, and console will unwatch when the func returns
-			console.unwatchAll()
-			maybe a way to specify the string to show when the value changes
-			need some way to tell the console what the name of the object is
-
 		- add functions for isRectangle, isText, etc. 
+
+		- maybe pass in a func callback, and console will unwatch when the 
+			func returns, call console.unwatchAll()
 
 		- support %s in first string passed to console.log, etc.
 
@@ -41,6 +36,12 @@
 				goes right to the global context
 
 	Done:
+		- add console.watch()
+			console.watch([[o, "foo"], [o, "bar"])
+			console.watch([[o, ["foo", "bar]], [p, "baz"])
+			maybe a way to specify the string to show when the value changes
+			need some way to tell the console what the name of the object is
+
 		- way to clear the console
 
 		- add keys(), forEach(), etc. to the eval'd script, console.dir
@@ -200,7 +201,7 @@ jdlib = jdlib || {};
 
 	var _ = (function() {
 		// these functions are pulled from the Underscore.js library and slightly
-		// modified to handle JS quirks in FW.
+		// modified to handle the quirks of FW's JS engine.
 		// 
 		//     Underscore.js 1.3.1
 		//     (c) 2009-2012 Jeremy Ashkenas, DocumentCloud Inc.
@@ -540,104 +541,109 @@ jdlib = jdlib || {};
 
 		  return _;
 	})();
-  
-		// embed a local copy of the dojo JSON library, which has been changed
-		// to not depend on any other part of dojo.  that way, we don't have to
-		// rely on external libraries.  unlike Crockford's library, the dojo
-		// implementation doesn't change the prototypes of basic types, which
-		// caused problems for the Path panel, and possibly others.
-	var dojo = {};
 
-	dojo.fromJson = function(/*String*/ json){
-		return eval("(" + json + ")"); // Object
-	}
 
-	dojo._escapeString = function(/*String*/str){
-		return ('"' + str.replace(/(["\\])/g, '\\$1') + '"').
-			replace(/[\f]/g, "\\f").replace(/[\b]/g, "\\b").replace(/[\n]/g, "\\n").
-			replace(/[\t]/g, "\\t").replace(/[\r]/g, "\\r"); // string
-	}
+	var dojo = (function() {
+			// embed a local copy of the dojo JSON library, which has been changed
+			// to not depend on any other part of dojo.  that way, we don't have to
+			// rely on external libraries.  unlike Crockford's library, the dojo
+			// implementation doesn't change the prototypes of basic types, which
+			// caused problems for the Path panel, and possibly others.
+		var dojo = {};
 
-	dojo.toJsonIndentStr = "\t";
-	dojo.toJson = function(/*Object*/ it, /*Boolean?*/ prettyPrint, /*String?*/ _indentStr){
-		if(it === undefined){
-				// dojo was incorrectly returning "undefined" here
-			return undefined;
+		dojo.fromJson = function(/*String*/ json){
+			return eval("(" + json + ")"); // Object
 		}
-		var objtype = typeof it;
-		if(objtype == "number" || objtype == "boolean"){
-			return it + "";
+
+		dojo._escapeString = function(/*String*/str){
+			return ('"' + str.replace(/(["\\])/g, '\\$1') + '"').
+				replace(/[\f]/g, "\\f").replace(/[\b]/g, "\\b").replace(/[\n]/g, "\\n").
+				replace(/[\t]/g, "\\t").replace(/[\r]/g, "\\r"); // string
 		}
-		if(it === null){
-			return "null";
-		}
-		if(typeof it == "string" || it instanceof String){
-			return dojo._escapeString(it);
-		}
-		// recurse
-		var recurse = arguments.callee;
-		// short-circuit for objects that support "json" serialization
-		// if they return "self" then just pass-through...
-		var newObj;
-		_indentStr = _indentStr || "";
-		var nextIndent = prettyPrint ? _indentStr + dojo.toJsonIndentStr : "";
-		var tf = it.__json__||it.json;
-		if(typeof tf == "function"){
-			newObj = tf.call(it);
-			if(it !== newObj){
-				return recurse(newObj, prettyPrint, nextIndent);
+
+		dojo.toJsonIndentStr = "\t";
+		dojo.toJson = function(/*Object*/ it, /*Boolean?*/ prettyPrint, /*String?*/ _indentStr){
+			if(it === undefined){
+					// dojo was incorrectly returning "undefined" here
+				return undefined;
 			}
-		}
-		if(it.nodeType && it.cloneNode){ // isNode
-			// we can't seriailize DOM nodes as regular objects because they have cycles
-			// DOM nodes could be serialized with something like outerHTML, but
-			// that can be provided by users in the form of .json or .__json__ function.
-			throw new Error("Can't serialize DOM nodes");
-		}
-
-		var sep = prettyPrint ? " " : "";
-		var newLine = prettyPrint ? "\n" : "";
-
-		// array
-		if(it && it instanceof Array){
-			var res = [];
-			for (var i = 0, len = it.length; i < len; i++) {
-				var val = recurse(it[i], prettyPrint, nextIndent);
-				if(typeof val != "string"){
-						// dojo was incorrectly returning "undefined" here
-					val = undefined;
+			var objtype = typeof it;
+			if(objtype == "number" || objtype == "boolean"){
+				return it + "";
+			}
+			if(it === null){
+				return "null";
+			}
+			if(typeof it == "string" || it instanceof String){
+				return dojo._escapeString(it);
+			}
+			// recurse
+			var recurse = arguments.callee;
+			// short-circuit for objects that support "json" serialization
+			// if they return "self" then just pass-through...
+			var newObj;
+			_indentStr = _indentStr || "";
+			var nextIndent = prettyPrint ? _indentStr + dojo.toJsonIndentStr : "";
+			var tf = it.__json__||it.json;
+			if(typeof tf == "function"){
+				newObj = tf.call(it);
+				if(it !== newObj){
+					return recurse(newObj, prettyPrint, nextIndent);
 				}
-				res[i] = newLine + nextIndent + val;
 			}
-			return "[" + res.join("," + sep) + newLine + _indentStr + "]";
-		}
-		if(objtype == "function"){
-			return null; // null
-		}
-		// generic object code path
-		var output = [], key;
-		for(key in it){
-			var keyStr, val;
-			if(typeof key == "number"){
-				keyStr = '"' + key + '"';
-			}else if(typeof key == "string"){
-				keyStr = dojo._escapeString(key);
-			}else{
-				// skip non-string or number keys
-				continue;
+			if(it.nodeType && it.cloneNode){ // isNode
+				// we can't seriailize DOM nodes as regular objects because they have cycles
+				// DOM nodes could be serialized with something like outerHTML, but
+				// that can be provided by users in the form of .json or .__json__ function.
+				throw new Error("Can't serialize DOM nodes");
 			}
-			val = recurse(it[key], prettyPrint, nextIndent);
-			if(typeof val != "string"){
-				// skip non-serializable values
-				continue;
-			}
-			// FIXME: use += on Moz!!
-			//	 MOW NOTE: using += is a pain because you have to account for the dangling comma...
-			output.push(newLine + nextIndent + keyStr + ":" + sep + val);
-		}
-		return "{" + output.join("," + sep) + newLine + _indentStr + "}"; // String
-	}
 
+			var sep = prettyPrint ? " " : "";
+			var newLine = prettyPrint ? "\n" : "";
+
+			// array
+			if(it && it instanceof Array){
+				var res = [];
+				for (var i = 0, len = it.length; i < len; i++) {
+					var val = recurse(it[i], prettyPrint, nextIndent);
+					if(typeof val != "string"){
+							// dojo was incorrectly returning "undefined" here
+						val = undefined;
+					}
+					res[i] = newLine + nextIndent + val;
+				}
+				return "[" + res.join("," + sep) + newLine + _indentStr + "]";
+			}
+			if(objtype == "function"){
+				return null; // null
+			}
+			// generic object code path
+			var output = [], key;
+			for(key in it){
+				var keyStr, val;
+				if(typeof key == "number"){
+					keyStr = '"' + key + '"';
+				}else if(typeof key == "string"){
+					keyStr = dojo._escapeString(key);
+				}else{
+					// skip non-string or number keys
+					continue;
+				}
+				val = recurse(it[key], prettyPrint, nextIndent);
+				if(typeof val != "string"){
+					// skip non-serializable values
+					continue;
+				}
+				// FIXME: use += on Moz!!
+				//	 MOW NOTE: using += is a pain because you have to account for the dangling comma...
+				output.push(newLine + nextIndent + keyStr + ":" + sep + val);
+			}
+			return "{" + output.join("," + sep) + newLine + _indentStr + "}"; // String
+		}
+		
+		return dojo;
+	})();
+	
 
 	var _counts = {},
 		_timers = {};
@@ -649,27 +655,6 @@ jdlib = jdlib || {};
 	}
 
 	
-	function extractCallerName(
-		inCaller)
-	{
-		var callerName = "";
-
-		try {
-			callerName = inCaller.NAME;
-
-			if (typeof callingFunction == "undefined" || callerName == "") {
-					// convert the function to a string, which should include
-					// the name if it's not an anonymous function
-				callerName = inCaller.toString().match(/^\s*function ([^)]+)\(/)[1];
-			}
-		} catch (exception) {
-			callerName = "";
-		}
-
-		return callerName;
-	}
-
-
 	function now()
 	{
 		return (new Date()).getTime();
@@ -707,7 +692,7 @@ jdlib = jdlib || {};
 		console._logEntries.push(dojo.toJson({
 			type: inType,
 			text: s.join(" "),
-			caller: extractCallerName(inCaller),
+			caller: inCaller.name || "",
 			time: now()
 		}));
 
@@ -717,6 +702,7 @@ jdlib = jdlib || {};
 	}
 
 
+		// create the console global
 	console = {
 			// we need to set this so dojo doesn't wipe out the console object
 			// if it loads after us
