@@ -61,7 +61,6 @@
   
 jdlib = jdlib || {};
 
-log("in FireworksConsole");
 
 // ===========================================================================
 (function()
@@ -197,57 +196,6 @@ log("in FireworksConsole");
 			return "undefined";
 		}
 	};
-	
-	
-	function useDojo()
-	{
-		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
-	}
-
-	
-	function extractCallerName(
-		inCaller)
-	{
-		var callerName = "";
-
-		try {
-			callerName = inCaller.NAME;
-
-			if (typeof callingFunction == "undefined" || callerName == "") {
-					// convert the function to a string, which should include
-					// the name if it's not an anonymous function
-				callerName = inCaller.toString().match(/^\s*function ([^)]+)\(/)[1];
-			}
-		} catch (exception) {
-			callerName = "";
-		}
-
-		return callerName;
-	}
-
-
-	function evaluateCode(
-		inCode)
-	{
-		var dom = fw.getDocumentDOM(),
-			sel = fw.selection,
-			el = fw.selection[0],
-			global = (function() { return this; })(),
-			__e__,
-			__r__;
-		
-		try {
-				// eval the code in the context of the underscore library, so
-				// the code can use keys(), pluck(), etc. 
-			with (_) {
-				__r__ = __StringFormatter__.format(eval(inCode));
-			}
-		} catch (__e__) {
-			__r__ = __e__.toString();
-		}
-		
-		return __r__;
-	}
 
 
 	var _ = (function() {
@@ -511,7 +459,7 @@ log("in FireworksConsole");
 
 		  // Is a given value an array?
 		  // Delegates to ECMA5's native Array.isArray
-		  _.isArray || function(obj) {
+		  _.isArray = function(obj) {
 			return toString.call(obj) == '[object Array]';
 		  };
 
@@ -580,7 +528,16 @@ log("in FireworksConsole");
 		  _.identity = function(value) {
 			return value;
 		  };
-		  
+
+		  // Safely convert anything iterable into a real, live array.
+		  _.toArray = function(iterable) {
+			if (!iterable)                return [];
+			if (iterable.toArray)         return iterable.toArray();
+			if (_.isArray(iterable))      return slice.call(iterable);
+			if (_.isArguments(iterable))  return slice.call(iterable);
+			return _.values(iterable);
+		  };
+
 		  return _;
 	})();
   
@@ -684,6 +641,33 @@ log("in FireworksConsole");
 
 	var _counts = {},
 		_timers = {};
+	
+	
+	function useDojo()
+	{
+		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
+	}
+
+	
+	function extractCallerName(
+		inCaller)
+	{
+		var callerName = "";
+
+		try {
+			callerName = inCaller.NAME;
+
+			if (typeof callingFunction == "undefined" || callerName == "") {
+					// convert the function to a string, which should include
+					// the name if it's not an anonymous function
+				callerName = inCaller.toString().match(/^\s*function ([^)]+)\(/)[1];
+			}
+		} catch (exception) {
+			callerName = "";
+		}
+
+		return callerName;
+	}
 
 
 	function now()
@@ -749,6 +733,9 @@ log("in FireworksConsole");
 			// the clear() method sets this to true to let the panel know to 
 			// clear the log display
 		_clearLog: false,
+		
+		
+		_watches: [],
 
 
 		_prepLogEntriesJSON: function()
@@ -767,7 +754,28 @@ log("in FireworksConsole");
 		},
 		
 		
-		evaluate: evaluateCode,
+		evaluate: function(
+			inCode)
+		{
+			var dom = fw.getDocumentDOM(),
+				sel = fw.selection,
+				el = fw.selection[0],
+				global = (function() { return this; })(),
+				__e__,
+				__r__;
+
+			try {
+					// eval the code in the context of the underscore library, so
+					// the code can use keys(), pluck(), etc. 
+				with (_) {
+					__r__ = __StringFormatter__.format(eval(inCode));
+				}
+			} catch (__e__) {
+				__r__ = __e__.toString();
+			}
+
+			return __r__;
+		},
 
 
 		time: function(
@@ -824,6 +832,39 @@ log("in FireworksConsole");
 			delete _counts[inCountName];
 		},
 
+
+		watch: function(
+			inObject,
+			inProperty,
+			inObjectName)
+		{
+			var objectName = inObjectName ? (inObjectName + ".") : "",
+					// annoyingly, callbacks used for watching don't seem to
+					// have any closure scope at all.  they can only access 
+					// local vars and literals.  since we want to include an
+					// optional object name in the log call, we have to build
+					// the callback as a string and then call Function().
+				callback = Function("inName", "inOldValue", "inNewValue",
+					'log(' + objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' + 
+					'return inNewValue;'
+				);
+				
+			this._watches.push({
+				object: inObject,
+				property: inProperty
+			});
+			
+			inObject.watch(inProperty, callback);
+		},
+		
+		
+		unwatchAll: function()
+		{
+			_.forEach(this._watches, function(watch) {
+				watch.object.unwatch(watch.property);
+			});
+		},
+		
 
 		dir: _.keys,
 
