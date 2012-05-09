@@ -18,17 +18,20 @@
 		- convert AS objects to JSON and send string to console
 
 		- doesn't seem to track the activeTool anymore 
+			fucking FW events just don't seem to work at all, in any version
+			fuck fuck fuck fuck fuck fucking fuck
+			still seem to work in JSML, but copying that code into this app
+				doesn't do anything
+			reverting back to older version doesn't work either
+				only works in old versions that don't poll 
+
+		- maybe listen for tool change events and dump the log entries whenever
+			it happens
+			the JS can then set the activeTool to generate an event
 
 		- evaluating code doesn't work when no doc is open
 
 		- don't show the printLog error if MMExecute is failing 
-
-		- support "el" variable for fw.selection[0]
-
-		- move evaluateCode to the console object instead of jdlib.FireworksConsole
-
-		- eval function in with ({}) { } so that creating variables doesn't
-			pollute the global namespace? 
 
 		- toggle for return evaluating the code
 
@@ -41,13 +44,17 @@
 		- support multiple console methods in AS, warn, error, etc., like in JS
 
 		- remember the divider size as a percentage, and restore based on the
-			current height of the
+			current height of the panel
 
 		- support filtering messages by type?
 
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
 
 	Done:
+		- move evaluateCode to the console object instead of jdlib.FireworksConsole
+
+		- support "el" variable for fw.selection[0]
+
 		- doing sel[0] on a RectanglePrimitive in CS5 returns a negative error
 			works in earlier versions? 
 
@@ -103,9 +110,6 @@ import com.adobe.serialization.json.*;
 import com.flexer.Debug;
 
 
-//include "assets/fwlog.as";
-
-
 // ===========================================================================
 private const ConsolePollInterval:uint = 2000;
 private const LogEntryPrefix:String = ">>>";
@@ -125,6 +129,8 @@ private const SupportedFWEvents:Object = {
 		// to the handler.
 	setfwActiveToolForSWFs: 1
 };
+
+// fuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
 
 
 // ===========================================================================
@@ -147,17 +153,24 @@ private var logs:Array = [];
 private function onPreinitialize() : void
 {
 try {
+logs.push("onPreinitialize");			
+	
 		// we need to register these callbacks early in the startup process.
 		// registering them from applicationComplete is too late.
 	if (ExternalInterface.available) {
 		ExternalInterface.addCallback("IsFwCallbackInstalled",
 			onIsFwCallbackInstalled);
 
+//		for (var eventName in SupportedFWEvents) {
+//			ExternalInterface.addCallback(eventName,
+//				createFWEventHandler(eventName));
+//		}
+
 			// create a handler for getting the active tool when it changes
 		ExternalInterface.addCallback("setfwActiveToolForSWFs",
-			function(inToolName:String)
+			function(inToolName)
 			{
-log("setfwActiveToolForSWFs", inToolName);
+log("**** console ********* setfwActiveToolForSWFs", inToolName);
 				currentTool = inToolName;
 			}
 		);
@@ -165,7 +178,6 @@ log("setfwActiveToolForSWFs", inToolName);
 		ExternalInterface.addCallback("onFwApplicationActivate",
 			function()
 			{
-//log("onFwApplicationActivate");
 					// restart polling, now that we're in the foreground
 				if (consolePollingEnabled) {
 					consolePollTimer.start();
@@ -176,7 +188,6 @@ log("setfwActiveToolForSWFs", inToolName);
 		ExternalInterface.addCallback("onFwApplicationDeactivate",
 			function()
 			{
-//log("onFwApplicationDeactivate");
 					// stop polling while in the background
 				consolePollTimer.stop();
 			}
@@ -187,6 +198,41 @@ logs.push("ERROR");
 logs.push(e.message);
 }
 }
+
+
+//private function createFWEventHandler(
+//	inEventName:String) : Function
+//{
+//	if (inEventName == "setfwActiveToolForSWFs") {
+//			// create a special handler for this event that stores the current
+//			// tool name, so we can check it in onAppJSEvent and ignore events
+//			// during text editing.  we have to use a special handler because
+//			// this is the only FW event that gets called with a parameter.  we
+//			// don't need to call onAppJSEvent from here because the JS side
+//			// shouldn't need to listen to this event.  it can just listen for
+//			// onFwActiveToolChange and then check fw.activeTool.
+//		return function(
+//				inToolName)
+//			{
+//logs.push(["==== console ********* setfwActiveToolForSWFs", inToolName]);
+//log("==== console ********* setfwActiveToolForSWFs", inToolName);
+//				currentTool = inToolName;
+//			};
+//	} else {
+//		return function()
+//			{
+//logs.push(["==== console method", inEventName]);
+//log("==== console method", inEventName);
+//
+//					// only pass the event to the panel if it's actually listening
+//					// for it, to avoid the overhead of passing data to the JS side.
+//					// switching documents triggers 4 events, so they can add up.
+////				if (inEventName in registeredFWEvents) {
+////					onAppJSEvent({ type: inEventName });
+////				}
+//			};
+//	}
+//}
 
 
 // ===========================================================================
@@ -233,10 +279,11 @@ private function main() : void
 	initLocalConnection();
 	
 	loadFCJS();
-log("Input", Debug.dump({ foo: 42 }));
+//log(new Date().toLocaleString());	
+//log("Input", Debug.dump({ foo: 42 }));
 //log("Input", JSON.encode(Input));
 
-//print("", logs.join("\n"));
+log(logs.join("\n"));
 //	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
 }
 
@@ -266,7 +313,6 @@ try {
 	
 		// serialize the code string to handle quotations, newlines, etc.
 	var result:String = callMethod('console.evaluate', code);
-//	var result:String = callMethod('jdlib.FireworksConsole.evaluateCode', code);
 	
 	print(LogEntryPrefix + " " + code + ":", result + "\n");
 } catch (e:*) {
@@ -405,7 +451,7 @@ private function printLog(
 			MMExecute("console._clearLog = false;");
 			return;
 		}
-		
+
 			// get the log entries as a JSON string and delete the string, since
 			// the console methods can't return anything without triggering the
 			// motherfucking modal processing command dialog.  then convert the
@@ -566,6 +612,8 @@ private function onConsolePoll(
 private function onIsFwCallbackInstalled(
 	inFunctionName:String) : Boolean
 {
+logs.push(["==== console onIsFwCallbackInstalled", inFunctionName, 	inFunctionName in SupportedFWEvents]);
+log("==== console onIsFwCallbackInstalled", inFunctionName, 	inFunctionName in SupportedFWEvents);
 	return (inFunctionName in SupportedFWEvents);
 }
 
