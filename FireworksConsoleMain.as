@@ -17,6 +17,8 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
+		- include trace library in AS and load it with FireworksConsole.js 
+
 		- doesn't seem to track the activeTool anymore 
 			fucking FW events just don't seem to work at all, in any version
 			fuck fuck fuck fuck fuck fucking fuck
@@ -161,11 +163,6 @@ logs.push("onPreinitialize");
 		ExternalInterface.addCallback("IsFwCallbackInstalled",
 			onIsFwCallbackInstalled);
 
-//		for (var eventName in SupportedFWEvents) {
-//			ExternalInterface.addCallback(eventName,
-//				createFWEventHandler(eventName));
-//		}
-
 			// create a handler for getting the active tool when it changes
 		ExternalInterface.addCallback("setfwActiveToolForSWFs",
 			function(inToolName)
@@ -198,41 +195,6 @@ logs.push("ERROR");
 logs.push(e.message);
 }
 }
-
-
-//private function createFWEventHandler(
-//	inEventName:String) : Function
-//{
-//	if (inEventName == "setfwActiveToolForSWFs") {
-//			// create a special handler for this event that stores the current
-//			// tool name, so we can check it in onAppJSEvent and ignore events
-//			// during text editing.  we have to use a special handler because
-//			// this is the only FW event that gets called with a parameter.  we
-//			// don't need to call onAppJSEvent from here because the JS side
-//			// shouldn't need to listen to this event.  it can just listen for
-//			// onFwActiveToolChange and then check fw.activeTool.
-//		return function(
-//				inToolName)
-//			{
-//logs.push(["==== console ********* setfwActiveToolForSWFs", inToolName]);
-//log("==== console ********* setfwActiveToolForSWFs", inToolName);
-//				currentTool = inToolName;
-//			};
-//	} else {
-//		return function()
-//			{
-//logs.push(["==== console method", inEventName]);
-//log("==== console method", inEventName);
-//
-//					// only pass the event to the panel if it's actually listening
-//					// for it, to avoid the overhead of passing data to the JS side.
-//					// switching documents triggers 4 events, so they can add up.
-////				if (inEventName in registeredFWEvents) {
-////					onAppJSEvent({ type: inEventName });
-////				}
-//			};
-//	}
-//}
 
 
 // ===========================================================================
@@ -279,12 +241,10 @@ private function main() : void
 	initLocalConnection();
 	
 	loadFCJS();
-//log(new Date().toLocaleString());	
+
 //log("Input", Debug.dump({ foo: 42 }));
-//log("Input", JSON.encode(Input));
 
 log(logs.join("\n"));
-//	MMExecute('fw.runScript("file:///C|/Projects/Fireworks/Commands/Dev/FireworksConsole/FireworksConsole.js")');
 }
 
 
@@ -487,6 +447,7 @@ private function loadFCJS() : void
 {
 		// load the embedded JS into FW, since it hasn't been during this session
 	MMExecute((new FireworksConsoleJS()).toString());
+	MMExecute((new TraceJS()).toString());
 }
 
 

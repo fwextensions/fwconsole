@@ -645,10 +645,6 @@ jdlib = jdlib || {};
 	})();
 	
 
-	var _counts = {},
-		_timers = {};
-	
-	
 	function useDojo()
 	{
 		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
@@ -702,6 +698,11 @@ jdlib = jdlib || {};
 	}
 
 
+	var _counts = {},
+		_timers = {},
+		_watches = [];
+	
+	
 		// create the console global
 	console = {
 			// we need to set this so dojo doesn't wipe out the console object
@@ -721,10 +722,6 @@ jdlib = jdlib || {};
 		_clearLog: false,
 		
 		
-			// track the objects and the properties that are being watched
-		_watches: [],
-
-
 		_prepLogEntriesJSON: function()
 		{
 			var entries = this._logEntries;
@@ -829,6 +826,10 @@ jdlib = jdlib || {};
 				// so we can run it through forEach below
 			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
 			
+			if (inObject === null) {
+				return;
+			}
+			
 			var objectName = inObjectName ? (inObjectName + ".") : "",
 					// annoyingly, callbacks used for watching don't seem to
 					// have any closure scope at all.  they can only access 
@@ -842,21 +843,59 @@ jdlib = jdlib || {};
 					
 			_.forEach(inProperties, function(property) {
 					// remember the watched object so we can unwatch it
-				this._watches.push({
+				_watches.push({
 					object: inObject,
 					property: property
 				});
 
 				inObject.watch(property, callback);
-			}, this);
+			});
+		},
+		
+		
+		unwatch: function(
+			inObject,
+			inProperties)
+		{
+				// turn inProperties into an array if it's just a single string
+				// so we can run it through forEach below
+			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
+			
+			if (inObject === null) {
+				return;
+			}
+			
+			_.forEach(inProperties, function(property) {
+				for (var i = 0, len = _watches.length; i < len; i++) {
+					var watch = _watches[i];
+
+					if (watch.object === inObject && watch.property == property) {
+							// delete this watch object since we're going to 
+							// unwatch the property
+						_watches.splice(i, 1);
+						break;
+					}
+				}
+				
+					// regardless of whether the watch was found, we can unwatch
+					// the property 
+				inObject.unwatch(property);
+			});
 		},
 		
 		
 		unwatchAll: function()
 		{
-			_.forEach(this._watches, function(watch) {
-				watch.object.unwatch(watch.property);
+			_.forEach(_watches, function(watch) {
+				if (watch.object) {
+						// it doesn't seem to matter if we unwatch a property
+						// that doesn't exist on the object
+					watch.object.unwatch(watch.property);
+				}
 			});
+			
+				// clear the list now that we've unwatched everything
+			_watches =[];
 		},
 		
 
