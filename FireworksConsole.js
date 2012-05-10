@@ -22,6 +22,8 @@
 			so don't have to call it __StringFormatter__
 			return the eval result to another function that formats the string
 
+		- put trace on console.trace()?
+
 		- maybe pass in a func callback, and console will unwatch when the 
 			func returns, call console.unwatchAll()
 
@@ -30,7 +32,7 @@
 		- check for loops and for root object so we don't keel over when 
 			typing dojo into the console 
 
-		- support assert() methods
+		- support assert lambda strings
 			would have to assert the expresion in the caller's context
 			could walk the parent contexts like in trace
 			http://v0.joehewitt.com/software/firebug/docs.php
@@ -41,6 +43,8 @@
 				goes right to the global context
 
 	Done:
+		- support assert() methods
+
 		- add console.watch()
 			console.watch([[o, "foo"], [o, "bar"])
 			console.watch([[o, ["foo", "bar]], [p, "baz"])
@@ -810,8 +814,15 @@ jdlib = jdlib || {};
 			inTimerName)
 		{
 			if (_timers[inTimerName]) {
-				var delta = now() - _timers[inTimerName];
-				addLogEntry("log", arguments.callee.caller, inTimerName + ":", delta / 1000, "sec");
+				var delta = now() - _timers[inTimerName],
+					unit = "ms";
+					
+				if (delta >= 1000) {
+					unit = "sec";
+					delta /= 1000;
+				}
+				
+				addLogEntry("log", arguments.callee.caller, inTimerName + ":", delta, unit);
 				delete _timers[inTimerName];
 			}
 		},
@@ -873,6 +884,18 @@ jdlib = jdlib || {};
 
 
 		// ===================================================================
+		assert: function(
+			inAssertion,
+			inMessage)
+		{
+			if (!inAssertion) {
+				addLogEntry.apply(this, ["error", arguments.callee.caller, 
+					"ASSERTION FAILED:"].concat(_.toArray(arguments).slice(1)));
+			}
+		},
+
+
+		// ===================================================================
 		watch: function(
 			inObject,
 			inProperties,
@@ -901,8 +924,8 @@ jdlib = jdlib || {};
 					// _addLogEntry so we can pass the watch callback's caller,
 					// which lets the console display its name.
 				callback = Function("inName", "inOldValue", "inNewValue",
-					'console._addLogEntry("log", arguments.callee.caller, ' + objectName.quote() + 
-					' + inName + ":", inOldValue, "=>", inNewValue);' + 
+					'console._addLogEntry("log", arguments.callee.caller, ' + 
+					objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' + 
 					'return inNewValue;'
 				);
 					
@@ -1046,6 +1069,14 @@ jdlib = jdlib || {};
 				caller: "",
 				time: now()
 			}));
+		},
+
+
+		// ===================================================================
+		showStackPrefix: function(
+			inEnabled)
+		{
+			_showStack = inEnabled;
 		},
 
 
