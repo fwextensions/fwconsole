@@ -17,6 +17,11 @@
 	To do:
 		- add functions for isRectangle, isText, etc. 
 
+		- put the eval call in a separate anonymous function that only has 
+			access to _ and the vars it defines
+			so don't have to call it __StringFormatter__
+			return the eval result to another function that formats the string
+
 		- maybe pass in a func callback, and console will unwatch when the 
 			func returns, call console.unwatchAll()
 
@@ -645,18 +650,21 @@ jdlib = jdlib || {};
 	})();
 	
 
+	// =======================================================================
 	function useDojo()
 	{
 		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
 	}
 
 	
+	// =======================================================================
 	function now()
 	{
 		return (new Date()).getTime();
 	}
 
 
+	// =======================================================================
 	function addLogEntry(
 		inType,
 		inCaller)
@@ -664,8 +672,11 @@ jdlib = jdlib || {};
 		if (arguments.length < 3) {
 			return;
 		}
+		
+		inCaller = inCaller || {};
 
-		var s = [];
+		var s = [],
+			callerName = inCaller.name || "anonymous";
 		
 		for (var i = 2, len = arguments.length; i < len; i++) {
 			var variant = arguments[i];
@@ -678,6 +689,22 @@ jdlib = jdlib || {};
 				s.push(__StringFormatter__.format(variant));
 			}
 		}
+		
+		if (_showStack) {
+			var callers = [];
+				
+				// follow the call stack, up to 5 deep, in case we run into a loop
+			for (var depth = 0, fn = inCaller.caller; depth < 5 && fn; depth++, fn = fn.caller) {
+				callers.push(fn.name || "anonymous");
+			}
+			
+			if (callers.length) {
+					// we walked the stack from bottom to top, but we want to 
+					// display the calls from top to bottom
+				callers.reverse();
+				callerName = callers.join(" > ") + " > " + callerName;
+			}
+		}
 
 			// due to the annoying-as-fuck modal "processing command" dialog that
 			// will appear on top of FW and require a force-quit if the call stack
@@ -688,7 +715,7 @@ jdlib = jdlib || {};
 		console._logEntries.push(dojo.toJson({
 			type: inType,
 			text: s.join(" "),
-			caller: inCaller.name || "",
+			caller: callerName,
 			time: now()
 		}));
 
@@ -700,7 +727,8 @@ jdlib = jdlib || {};
 
 	var _counts = {},
 		_timers = {},
-		_watches = [];
+		_watches = [],
+		_showStack = false;
 	
 	
 		// create the console global
@@ -722,6 +750,12 @@ jdlib = jdlib || {};
 		_clearLog: false,
 		
 		
+			// provide access to the raw addLogEntry so object watchers can 
+			// pass their caller
+		_addLogEntry: addLogEntry,
+		
+		
+		// ===================================================================
 		_prepLogEntriesJSON: function()
 		{
 			var entries = this._logEntries;
@@ -738,6 +772,7 @@ jdlib = jdlib || {};
 		},
 		
 		
+		// ===================================================================
 		evaluate: function(
 			inCode)
 		{
@@ -762,6 +797,7 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
 		time: function(
 			inTimerName)
 		{
@@ -769,6 +805,7 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
 		timeEnd: function(
 			inTimerName)
 		{
@@ -780,6 +817,7 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
 		count: function(
 			inCountName,
 			inSuppressDisplay)
@@ -796,6 +834,7 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
 		countDisplay: function(
 			inCountName,
 			inReset)
@@ -810,6 +849,7 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
 		countReset: function(
 			inCountName)
 		{
@@ -817,27 +857,52 @@ jdlib = jdlib || {};
 		},
 
 
+		// ===================================================================
+		dir: function(
+			inObject,
+			inMessage)
+		{
+			inMessage = inMessage ? inMessage + ": " : "";
+			
+				// we need to call StringFormatter ourselves, since if we 
+				// passed inMessage as a separate parameter, there'd be an extra
+				// space in the log if inMessage was empty
+			addLogEntry.apply(this, ["log", arguments.callee.caller, 
+				inMessage + __StringFormatter__.format(_.keys(inObject))]);
+		},
+
+
+		// ===================================================================
 		watch: function(
 			inObject,
 			inProperties,
 			inObjectName)
 		{
-				// turn inProperties into an array if it's just a single string
-				// so we can run it through forEach below
-			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
-			
 			if (inObject === null) {
 				return;
 			}
+			
+			if (!inProperties || inProperties == "*") {
+					// the caller wants to watch all the properties on the object
+				inProperties = _.keys(inObject);
+			}
+			
+				// turn inProperties into an array if it's just a single string
+				// so we can run it through forEach below
+			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
 			
 			var objectName = inObjectName ? (inObjectName + ".") : "",
 					// annoyingly, callbacks used for watching don't seem to
 					// have any closure scope at all.  they can only access 
 					// local vars and literals.  since we want to include an
 					// optional object name in the log call, we have to build
-					// the callback as a string and then call Function().
+					// the callback as a string and then call Function().  
+					// instead of calling log(), call the lower-level 
+					// _addLogEntry so we can pass the watch callback's caller,
+					// which lets the console display its name.
 				callback = Function("inName", "inOldValue", "inNewValue",
-					'log(' + objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' + 
+					'console._addLogEntry("log", arguments.callee.caller, ' + objectName.quote() + 
+					' + inName + ":", inOldValue, "=>", inNewValue);' + 
 					'return inNewValue;'
 				);
 					
@@ -851,21 +916,29 @@ jdlib = jdlib || {};
 				inObject.watch(property, callback);
 			});
 		},
-		
-		
+
+
+		// ===================================================================
 		unwatch: function(
 			inObject,
 			inProperties)
 		{
-				// turn inProperties into an array if it's just a single string
-				// so we can run it through forEach below
-			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
-			
 			if (inObject === null) {
 				return;
 			}
 			
+			if (!inProperties || inProperties == "*") {
+					// the caller wants to unwatch all the properties on the object
+				inProperties = _.keys(inObject);
+			}
+			
+				// turn inProperties into an array if it's just a single string
+				// so we can run it through forEach below
+			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
+			
 			_.forEach(inProperties, function(property) {
+					// look for the watch object corresponding to this property
+					// and object in _watches
 				for (var i = 0, len = _watches.length; i < len; i++) {
 					var watch = _watches[i];
 
@@ -884,6 +957,7 @@ jdlib = jdlib || {};
 		},
 		
 		
+		// ===================================================================
 		unwatchAll: function()
 		{
 			_.forEach(_watches, function(watch) {
@@ -899,9 +973,83 @@ jdlib = jdlib || {};
 		},
 		
 
-		dir: _.keys,
+		// ===================================================================
+		showStack: function()
+		{
+			var stack = [],
+				name,
+				call,
+				callKeys,
+				params, 
+				paramName,
+				paramValue,
+				paramString,
+				match;
+				
+				// follow the call stack, up to 5 deep, in case we run into a 
+				// recursive function, which causes a loop in the caller chain 
+			for (var depth = 0, fn = arguments.callee.caller; depth < 5 && fn; depth++, fn = fn.caller) {
+				name = fn.name || "anonymous";
+				call = fn.__call__;
+					// we want the keys in their natural order, not sorted
+				callKeys = _.keys(call, true);
+				params = [];
+
+					// we assume that the enumeration order of the properties
+					// on __call__ is the same as the source order of the params
+					// and local vars, which seems to be true
+				for (var i = 0, len = fn.arity; i < len; i++) {
+					paramName = callKeys[i];
+					paramValue = call[paramName];
+
+					if (paramValue instanceof Array) {
+						paramString = "Array";
+					} else if (typeof paramValue == "string") {
+						paramString = paramValue.quote();
+					} else {
+							// don't call .toString() so that we can get a string
+							// representation of things like null
+						paramString = paramValue + "";
+						match = paramString.match(/^\[object (\w+)\]$/);
+						
+						if (match) {
+								// extract the name of the type from the string
+							paramString = match[1];
+						}
+					}
+					
+					params.push(paramName + ": " + paramString);
+				}
+				
+					// display one call per line 
+				stack.push(name + "(" + params.join(", ") + ")");
+			}
+			
+				// we walked the stack from bottom to top, but we want to 
+				// display the calls from top to bottom.  show "Call stack:"
+				// before the list of calls.
+			stack.push("Call stack:");
+			stack.reverse();
+			
+			stack = _.map(stack, function(item, i) {
+				var spaces = [];
+				spaces.length = i * 2 + 1;
+				
+				return spaces.join(" ") + item;
+			});
+			
+				// push the stack information directly onto the log array so
+				// that we can control the caller string
+			this._logEntries.push(dojo.toJson({
+				type: "log",
+				text: stack.join("\n"),
+				caller: "",
+				time: now()
+			}));
+		},
 
 
+		// ===================================================================
 		clear: function()
 		{
 			this._logEntries = [];

@@ -26,6 +26,8 @@
 				doesn't do anything
 			reverting back to older version doesn't work either
 				only works in old versions that don't poll 
+			and now it suddenly started working again, without changing anything
+				and without restarting.  wtf? 
 
 		- maybe listen for tool change events and dump the log entries whenever
 			it happens
@@ -409,7 +411,6 @@ private function printLog(
 				// and bail
 			clearOutput();
 			MMExecute("console._clearLog = false;");
-			return;
 		}
 
 			// get the log entries as a JSON string and delete the string, since
