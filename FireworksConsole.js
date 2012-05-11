@@ -997,7 +997,8 @@ jdlib = jdlib || {};
 		
 
 		// ===================================================================
-		showStack: function()
+		showStack: function(
+			inMessage)
 		{
 			var stack = [],
 				name,
@@ -1048,10 +1049,12 @@ jdlib = jdlib || {};
 				stack.push(name + "(" + params.join(", ") + ")");
 			}
 			
+			inMessage = inMessage ? " [" + inMessage + "]" : "";
+			stack.push("Call stack" + inMessage + ":");
+			
 				// we walked the stack from bottom to top, but we want to 
 				// display the calls from top to bottom.  show "Call stack:"
 				// before the list of calls.
-			stack.push("Call stack:");
 			stack.reverse();
 			
 			stack = _.map(stack, function(item, i) {

@@ -134,8 +134,6 @@ private const SupportedFWEvents:Object = {
 	setfwActiveToolForSWFs: 1
 };
 
-// fuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
-
 
 // ===========================================================================
 [Bindable]
@@ -157,8 +155,6 @@ private var logs:Array = [];
 private function onPreinitialize() : void
 {
 try {
-logs.push("onPreinitialize");			
-	
 		// we need to register these callbacks early in the startup process.
 		// registering them from applicationComplete is too late.
 	if (ExternalInterface.available) {
@@ -169,7 +165,6 @@ logs.push("onPreinitialize");
 		ExternalInterface.addCallback("setfwActiveToolForSWFs",
 			function(inToolName)
 			{
-log("**** console ********* setfwActiveToolForSWFs", inToolName);
 				currentTool = inToolName;
 			}
 		);
@@ -245,8 +240,7 @@ private function main() : void
 	loadFCJS();
 
 //log("Input", Debug.dump({ foo: 42 }));
-
-log(logs.join("\n"));
+//log(logs.join("\n"));
 }
 
 
@@ -297,7 +291,7 @@ private function print(
 		inText = inText.replace(/&/g, "&amp;");
 		inText = inText.replace(/</g, "&lt;");
 		inText = inText.replace(/>/g, "&gt;");
-		
+
 		Output.htmlText += '<font color="#585880">' + inPrefix + "</font> " + inText;
 	} else {
 			// there's no prefix, so we don't need to deal with html-formatted text
@@ -366,7 +360,12 @@ private function showNextCodeEntry() : void
 // ===========================================================================
 private function clearOutput() : void
 {
+		// to clear the output, we seem to have to also set the htmlText 
+		// property to an empty string.  setting just the text property can 
+		// display a "null" string in the log.  possibly htmlText is null after
+		// text is cleared, so Output.htmlText += "..." prepends the null.
 	Output.text = "";
+	Output.htmlText = "";
 	prefs.data.savedOutput = "";
 
 		// switch the focus from the button back to the doc
@@ -395,7 +394,9 @@ private function togglePolling() : void
 public function log(
 	...inArgs) : void
 {
-	print("", inArgs.join(", ") + "\n");
+//	Log.text += inArgs.join(", ") + "\n";
+//	Log.validateNow();
+//	Log.verticalScrollPosition = Output.maxVerticalScrollPosition;
 }
 
 
@@ -409,8 +410,8 @@ private function printLog(
 		if (JSON.decode(clearLog)) {
 				// the user has called console.clear(), so clear our log display
 				// and bail
-			clearOutput();
 			MMExecute("console._clearLog = false;");
+			clearOutput();
 		}
 
 			// get the log entries as a JSON string and delete the string, since
@@ -418,7 +419,7 @@ private function printLog(
 			// motherfucking modal processing command dialog.  then convert the
 			// JSON entires to an array.
 		var entriesJSON = MMExecute("console._prepLogEntriesJSON(); console._logEntriesJSON");
-		MMExecute('console._logEntriesJSON = ""');
+		MMExecute('console._logEntriesJSON = "";');
 		var entries = JSON.decode(entriesJSON);
 
 		if (entries is Array && entries.length > 0) {
@@ -574,8 +575,6 @@ private function onConsolePoll(
 private function onIsFwCallbackInstalled(
 	inFunctionName:String) : Boolean
 {
-logs.push(["==== console onIsFwCallbackInstalled", inFunctionName, 	inFunctionName in SupportedFWEvents]);
-log("==== console onIsFwCallbackInstalled", inFunctionName, 	inFunctionName in SupportedFWEvents);
 	return (inFunctionName in SupportedFWEvents);
 }
 

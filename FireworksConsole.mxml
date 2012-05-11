@@ -94,6 +94,12 @@
 			editable="false"
 			horizontalScrollPolicy="off" 
 		/>
+<!--		<mx:TextArea id="Log"
+			width="100%"
+			minHeight="100"
+			editable="false"
+			horizontalScrollPolicy="off" 
+		/>-->
 	</mx:VDividedBox>
 	
 </mx:Application>
