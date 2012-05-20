@@ -17,6 +17,20 @@
 	To do:
 		- add functions for isRectangle, isText, etc. 
 
+		- setting dojo to null in an eval'd script sets it to null in the 
+			scope of the console, breaking log()
+
+		- maybe accessing a getter on the console wouldn't cause the processing
+			dialog, and it could return the stringified JSON
+
+		- support console.group to make it easier to see the call flow
+			but maybe the stack prefix is enough
+
+		- indicate that log was called from the global scope, outside a function
+
+		- maybe have option to prefix logs with name of JS file 
+			only works up to the first runScript in a file 
+
 		- put the eval call in a separate anonymous function that only has 
 			access to _ and the vars it defines
 			so don't have to call it __StringFormatter__
@@ -43,6 +57,11 @@
 				goes right to the global context
 
 	Done:
+		- show just anon() in the stack prefix, so it's more compact
+			or maybe just main() > () > ()
+
+		- support logging arguments
+
 		- support assert() methods
 
 		- add console.watch()
@@ -69,9 +88,6 @@
 */
 
   
-jdlib = jdlib || {};
-
-
 // ===========================================================================
 (function()
 {
@@ -116,8 +132,9 @@ jdlib = jdlib || {};
 			
 			if (inObject == null) {
 				return "null";
-			} else if (inObject instanceof Array || inObject.toString() == "[object FwArray]") {
-				return this["array"](inObject, inDepth);
+			} else if (inObject instanceof Array || inObject.toString() == "[object FwArray]" ||
+					inObject.toString() == "[object Arguments]") {
+				return this.array(inObject, inDepth);
 			} else if (typeof inObject.__repr__ == "function") {
 				return inObject.__repr__();
 			}
@@ -680,7 +697,7 @@ jdlib = jdlib || {};
 		inCaller = inCaller || {};
 
 		var s = [],
-			callerName = inCaller.name || "anonymous";
+			callerName = inCaller.name || "";
 		
 		for (var i = 2, len = arguments.length; i < len; i++) {
 			var variant = arguments[i];
@@ -699,14 +716,14 @@ jdlib = jdlib || {};
 				
 				// follow the call stack, up to 5 deep, in case we run into a loop
 			for (var depth = 0, fn = inCaller.caller; depth < 5 && fn; depth++, fn = fn.caller) {
-				callers.push(fn.name || "anonymous");
+				callers.push(fn.name || ".");
 			}
 			
 			if (callers.length) {
 					// we walked the stack from bottom to top, but we want to 
 					// display the calls from top to bottom
 				callers.reverse();
-				callerName = callers.join(" > ") + " > " + callerName;
+				callerName = callers.join(" > ") + " > " + (callerName || "anonymous");
 			}
 		}
 
@@ -723,9 +740,9 @@ jdlib = jdlib || {};
 			time: now()
 		}));
 
-			// keep only the last 50 log entries, in case the console panel
+			// keep only the last X log entries, in case the console panel
 			// isn't picking them up
-		console._logEntries = console._logEntries.slice(-50);
+		console._logEntries = console._logEntries.slice(-console.retention);
 	}
 
 
@@ -740,6 +757,11 @@ jdlib = jdlib || {};
 			// we need to set this so dojo doesn't wipe out the console object
 			// if it loads after us
 		firebug: true,
+		
+		
+			// the max number of log entries to keep
+		retention: 100,
+		
 
 			// this array stores the JSON strings until the panel wants them
 		_logEntries: [],
@@ -877,9 +899,11 @@ jdlib = jdlib || {};
 			
 				// we need to call StringFormatter ourselves, since if we 
 				// passed inMessage as a separate parameter, there'd be an extra
-				// space in the log if inMessage was empty
+				// space in the log if inMessage was empty.  also pass any args
+				// after inMessage to addLogEntry, so that they get displayed.
 			addLogEntry.apply(this, ["log", arguments.callee.caller, 
-				inMessage + __StringFormatter__.format(_.keys(inObject))]);
+				inMessage + __StringFormatter__.format(_.keys(inObject))]
+				.concat(_.toArray(arguments).slice(2)));
 		},
 
 
