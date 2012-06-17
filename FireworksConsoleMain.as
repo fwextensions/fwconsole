@@ -17,7 +17,23 @@
 	To do:
 		- convert AS objects to JSON and send string to console
 
-		- include trace library in AS and load it with FireworksConsole.js 
+		- no longer seems to load the console JS code when it's opened
+
+		- pressing Print .js Logs causes color of all text in console to change
+
+		- isNaN("asdf") is false when run in the console, but true when run in
+			a script.  wtf?
+
+		- add a console method to reset the global space to the state it was in
+			when the panel loaded
+			or maybe just try to delete everything, and hopefully the FW stuff 
+				will ignore the delete
+
+		- make console work when no docs are open
+
+		- evaluating code doesn't work when no doc is open
+			might have been a problem with accessing fw.selection[0], but that
+				should be fixed now
 
 		- doesn't seem to track the activeTool anymore 
 			fucking FW events just don't seem to work at all, in any version
@@ -32,8 +48,6 @@
 		- maybe listen for tool change events and dump the log entries whenever
 			it happens
 			the JS can then set the activeTool to generate an event
-
-		- evaluating code doesn't work when no doc is open
 
 		- don't show the printLog error if MMExecute is failing 
 
@@ -55,6 +69,8 @@
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
 
 	Done:
+		- include trace library in AS and load it with FireworksConsole.js 
+
 		- move evaluateCode to the console object instead of jdlib.FireworksConsole
 
 		- support "el" variable for fw.selection[0]
@@ -239,6 +255,9 @@ private function main() : void
 	
 	loadFCJS();
 
+//var lc:LocalConnection = new LocalConnection();
+//lc.send("FireworksConsole", "log", "fuuuuuuuuuuuuuuuuuuuuuuu");
+
 //log("Input", Debug.dump({ foo: 42 }));
 //log(logs.join("\n"));
 }
@@ -394,9 +413,9 @@ private function togglePolling() : void
 public function log(
 	...inArgs) : void
 {
-//	Log.text += inArgs.join(", ") + "\n";
-//	Log.validateNow();
-//	Log.verticalScrollPosition = Output.maxVerticalScrollPosition;
+	Output.text += inArgs.join(", ") + "\n";
+	Output.validateNow();
+	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
 }
 
 
@@ -551,7 +570,6 @@ private function onDividerRelease(
 private function onConsolePoll(
 	inEvent:TimerEvent) : void
 {
-//log("onConsolePoll", currentTool);	
 		// don't poll if the user has any of these tools selected, because if
 		// they're editing text, scaling the selection, etc., then polling will
 		// cancel the edit mode

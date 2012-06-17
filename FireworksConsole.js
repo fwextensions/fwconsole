@@ -17,6 +17,9 @@
 	To do:
 		- add functions for isRectangle, isText, etc. 
 
+		- the real console.trace does a live version of showStack
+			change the name? 
+
 		- setting dojo to null in an eval'd script sets it to null in the 
 			scope of the console, breaking log()
 
@@ -569,17 +572,13 @@
 	})();
 
 
-	var dojo = (function() {
+	var __stringify = (function() {
 			// embed a local copy of the dojo JSON library, which has been changed
 			// to not depend on any other part of dojo.  that way, we don't have to
 			// rely on external libraries.  unlike Crockford's library, the dojo
 			// implementation doesn't change the prototypes of basic types, which
 			// caused problems for the Path panel, and possibly others.
 		var dojo = {};
-
-		dojo.fromJson = function(/*String*/ json){
-			return eval("(" + json + ")"); // Object
-		}
 
 		dojo._escapeString = function(/*String*/str){
 			return ('"' + str.replace(/(["\\])/g, '\\$1') + '"').
@@ -667,17 +666,10 @@
 			return "{" + output.join("," + sep) + newLine + _indentStr + "}"; // String
 		}
 		
-		return dojo;
+		return dojo.toJson;
 	})();
 	
 
-	// =======================================================================
-	function useDojo()
-	{
-		if (typeof dojo == "undefined") { fw.runScript("lib/dojo/dojo.js"); }
-	}
-
-	
 	// =======================================================================
 	function now()
 	{
@@ -733,7 +725,7 @@
 			// of the log entries to JSON until the console polls for the latest
 			// entries.  so we have to convert the parameters to a JSON string
 			// now, and push the string onto an array.  ffs.
-		console._logEntries.push(dojo.toJson({
+		console._logEntries.push(__stringify.toJson({
 			type: inType,
 			text: s.join(" "),
 			caller: callerName,
@@ -802,9 +794,13 @@
 		evaluate: function(
 			inCode)
 		{
-			var dom = fw.getDocumentDOM(),
+				// annoyingly, calling fw.getDocumentDOM() when no docs are 
+				// open seems to throw an error, which doesn't seem to get
+				// reported by the console.  to make the console work when no
+				// doc is open, call getDocumentDOM only when something is open.
+			var dom = fw.documents.length && fw.getDocumentDOM(),
 				sel = fw.selection,
-				el = fw.selection[0],
+				el = fw.selection && fw.selection[0],
 				global = (function() { return this; })(),
 				__e__,
 				__r__;
@@ -887,6 +883,20 @@
 			inCountName)
 		{
 			delete _counts[inCountName];
+		},
+
+
+		// ===================================================================
+		line: function(
+			inSegment,
+			inCount)
+		{
+			inSegment = inSegment || "-";
+			inCount = isNaN(inCount) ? 60 : inCount;
+			
+			var line = [];
+			line.length = Math.round((inCount + 1) / inSegment.length);
+			this.log(line.join(inSegment));
 		},
 
 
@@ -1090,7 +1100,7 @@
 			
 				// push the stack information directly onto the log array so
 				// that we can control the caller string
-			this._logEntries.push(dojo.toJson({
+			this._logEntries.push(__stringify({
 				type: "log",
 				text: stack.join("\n"),
 				caller: "",
