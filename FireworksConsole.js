@@ -725,7 +725,7 @@
 			// of the log entries to JSON until the console polls for the latest
 			// entries.  so we have to convert the parameters to a JSON string
 			// now, and push the string onto an array.  ffs.
-		console._logEntries.push(__stringify.toJson({
+		console._logEntries.push(__stringify({
 			type: inType,
 			text: s.join(" "),
 			caller: callerName,
