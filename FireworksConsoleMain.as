@@ -162,6 +162,7 @@ private var consoleLC:LocalConnection = new LocalConnection();
 private var currentCodeEntry:int = 0;
 private var lastLogEntryTime:Number = 0;
 private var isShiftDown:Boolean = false;
+private var isCtrlDown:Boolean = false;
 private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
 private var currentTool:String = "";
 private var logs:Array = [];
@@ -274,7 +275,7 @@ private function initLocalConnection() : void
 
 
 // ===========================================================================
-private function evaluateCode() : void
+private function evaluateCode(inClearInput:Boolean = true) : void
 {
 try {
 	var code:String = Input.text;
@@ -284,7 +285,10 @@ try {
 	}
 	
 	addCodeEntry(code);
-	Input.text = "";
+	
+	if (inClearInput) {
+		Input.text = "";
+	}
 	
 		// serialize the code string to handle quotations, newlines, etc.
 	var result:String = callMethod('console.evaluate', code);
@@ -512,7 +516,7 @@ private function onTextInput(
 			// added to the text
 		inEvent.preventDefault();
 		inEvent.stopPropagation();
-		evaluateCode();
+		evaluateCode(!isCtrlDown);
 	}
 }
 
@@ -538,6 +542,7 @@ private function onInputKeyDown(
 		// track whether the shift key is down so we can check its state in
 		// onTextInput
 	isShiftDown = inEvent.shiftKey;
+	isCtrlDown = inEvent.ctrlKey;
 }
 
 
