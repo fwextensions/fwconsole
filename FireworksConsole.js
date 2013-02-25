@@ -1,26 +1,22 @@
 /* ===========================================================================
-	
-	File: FireworksConsole.js
 
-	Author - John Dunning
-	Copyright - 2012 John Dunning.  All rights reserved.
-	Email - fw@johndunning.com
-	Website - http://johndunning.com/fireworks
+	FireworksConsole.js
 
-	Release - 0.4.0 ($Revision: 1.8 $)
-	Last update - $Date: 2010/05/11 19:42:17 $
+	Copyright 2013 John Dunning.  All rights reserved.
+	fw@johndunning.com
+	http://johndunning.com/fireworks
 
    ======================================================================== */
 
 
 /*
 	To do:
-		- add functions for isRectangle, isText, etc. 
+		- add functions for isRectangle, isText, etc.
 
 		- the real console.trace does a live version of showStack
-			change the name? 
+			change the name?
 
-		- setting dojo to null in an eval'd script sets it to null in the 
+		- setting dojo to null in an eval'd script sets it to null in the
 			scope of the console, breaking log()
 
 		- maybe accessing a getter on the console wouldn't cause the processing
@@ -31,23 +27,23 @@
 
 		- indicate that log was called from the global scope, outside a function
 
-		- maybe have option to prefix logs with name of JS file 
-			only works up to the first runScript in a file 
+		- maybe have option to prefix logs with name of JS file
+			only works up to the first runScript in a file
 
-		- put the eval call in a separate anonymous function that only has 
+		- put the eval call in a separate anonymous function that only has
 			access to _ and the vars it defines
 			so don't have to call it __StringFormatter__
 			return the eval result to another function that formats the string
 
 		- put trace on console.trace()?
 
-		- maybe pass in a func callback, and console will unwatch when the 
+		- maybe pass in a func callback, and console will unwatch when the
 			func returns, call console.unwatchAll()
 
 		- support %s in first string passed to console.log, etc.
 
-		- check for loops and for root object so we don't keel over when 
-			typing dojo into the console 
+		- check for loops and for root object so we don't keel over when
+			typing dojo into the console
 
 		- support assert lambda strings
 			would have to assert the expresion in the caller's context
@@ -55,7 +51,7 @@
 			http://v0.joehewitt.com/software/firebug/docs.php
 
 		- eval the script in a with ({}) block so that created vars go on that
-			object, instead of the global context 
+			object, instead of the global context
 			setting an undefined var doesn't add a property to the object
 				goes right to the global context
 
@@ -90,7 +86,7 @@
 		- add console.log() API
 */
 
-  
+
 // ===========================================================================
 (function()
 {
@@ -109,30 +105,30 @@
 				return "UNKNOWN";
 			}
 		},
-		
-		
+
+
 		"array": function(
 			inArray,
 			inDepth)
 		{
 			inDepth = inDepth || 0;
 			var items = [];
-		
+
 			for (var i = 0, len = inArray.length; i < len; i++) {
 				items.push(this.format(inArray[i], inDepth + 1));
 			}
-		
+
 			return "[" + items.join(", ") + "]";
 		},
-		
-		
+
+
 		"object": function(
 			inObject,
 			inDepth,
 			inAttributes)
 		{
 			inDepth = inDepth || 0;
-			
+
 			if (inObject == null) {
 				return "null";
 			} else if (inObject instanceof Array || inObject.toString() == "[object FwArray]" ||
@@ -144,7 +140,7 @@
 
 			var emptyObject = {},
 				keys = [];
-		
+
 			if (typeof inAttributes == "undefined") {
 				try {
 					for (var attribute in inObject) {
@@ -153,74 +149,74 @@
 						}
 					}
 				} catch (exception) { }
-		
+
 				keys.sort();
 			} else {
 				keys = inAttributes;
 			}
-		
+
 			if (keys.length == 0) {
 					// don't waste 3 lines on an empty object
 				return "{ }";
 			}
-		
+
 			var attributes = [];
-		
+
 			for (var i = 0, len = keys.length; i < len; i++) {
 				var key = keys[i];
 
 					// skip javascriptString, since it's a string representation
 					// of the object, which we're building ourselves.  also skip
-					// pathOperation, which throws an exception if you just 
+					// pathOperation, which throws an exception if you just
 					// look at it funny.
 				if (key != "javascriptString" && key != "pathOperation") {
 					attributes.push(key + ": " + this.format(inObject[key], inDepth + 1));
 				}
 			}
-			
+
 			var tabs = "\t",
 				result;
-				
+
 			while (inDepth-- > 0) { tabs += "\t"; }
-			
+
 			if (attributes.length < 5) {
 				result = "{ " + attributes.join(", ") + " }";
 			} else {
 				result = ["{\n", tabs, attributes.join(",\n" + tabs), "\n", tabs.slice(1), "}"].join("");
 			}
-			
+
 			return result;
 		},
-		
-		
+
+
 		"string": function(
 			inString)
 		{
 			return '"' + inString + '"';
 		},
-		
-		
+
+
 		"number": function(
 			inNumber)
 		{
 			return inNumber.toString();
 		},
-		
-		
+
+
 		"boolean": function(
 			inBoolean)
 		{
 			return inBoolean.toString();
 		},
-		
-		
+
+
 		"function": function(
 			inFunction)
 		{
 			return "function() {...}";
 		},
-		
-		
+
+
 		"undefined": function()
 		{
 			return "undefined";
@@ -231,7 +227,7 @@
 	var _ = (function() {
 		// these functions are pulled from the Underscore.js library and slightly
 		// modified to handle the quirks of FW's JS engine.
-		// 
+		//
 		//     Underscore.js 1.4.3
 		//     http://underscorejs.org
 		//     (c) 2009-2012 Jeremy Ashkenas, DocumentCloud Inc.
@@ -239,9 +235,6 @@
 
 		  // Establish the object that gets returned to break out of a loop iteration.
 		  var breaker = false;
-		  
-		  // set up the local _ object that we'll return when done
-		  var _ = {};
 
 		  // Save bytes in the minified (but not gzipped) version:
 		  var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
@@ -268,6 +261,13 @@
 			nativeIsArray      = Array.isArray,
 			nativeKeys         = Object.keys,
 			nativeBind         = FuncProto.bind;
+
+		  // Create a safe reference to the Underscore object for use below.
+		  var _ = function(obj) {
+			if (obj instanceof _) return obj;
+			if (!(this instanceof _)) return new _(obj);
+			this._wrapped = obj;
+		  };
 
 		  // Collection Functions
 		  // --------------------
@@ -871,13 +871,13 @@
 			if (obj !== Object(obj)) throw new TypeError('Invalid object');
 			var keys = [];
 			for (var key in obj) if (_.has(obj, key)) keys[keys.length] = key;
-			
+
 				// sort the list of keys by default to make the list easier to
 				// scan in the console
 			if (!dontSort) {
 				keys.sort();
 			}
-			
+
 			return keys;
 		  };
 
@@ -1165,39 +1165,160 @@
 			return min + Math.floor(Math.random() * (max - min + 1));
 		  };
 
+		  // If the value of the named property is a function then invoke it;
+		  // otherwise, return it.
+		  _.result = function(object, property) {
+			if (object == null) return null;
+			var value = object[property];
+			return _.isFunction(value) ? value.call(object) : value;
+		  };
+
+		  // Add your own custom functions to the Underscore object.
+		  _.mixin = function(obj) {
+			each(_.functions(obj), function(name){
+			  var func = _[name] = obj[name];
+			  _.prototype[name] = function() {
+				var args = [this._wrapped];
+				push.apply(args, arguments);
+				return result.call(this, func.apply(_, args));
+			  };
+			});
+		  };
+
+		  // Add a "chain" function, which will delegate to the wrapper.
+		  _.chain = function(obj) {
+			return _(obj).chain();
+		  };
+
+		  // OOP
+		  // ---------------
+		  // If Underscore is called as a function, it returns a wrapped object that
+		  // can be used OO-style. This wrapper holds altered versions of all the
+		  // underscore functions. Wrapped objects may be chained.
+
+		  // Helper function to continue chaining intermediate results.
+		  var result = function(obj) {
+			return this._chain ? _(obj).chain() : obj;
+		  };
+
+		  // Add all of the Underscore functions to the wrapper object.
+		  _.mixin(_);
+
+		  // Add all mutator Array functions to the wrapper.
+		  each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
+			var method = ArrayProto[name];
+			_.prototype[name] = function() {
+			  var obj = this._wrapped;
+			  method.apply(obj, arguments);
+			  if ((name == 'shift' || name == 'splice') && obj.length === 0) delete obj[0];
+			  return result.call(this, obj);
+			};
+		  });
+
+		  // Add all accessor Array functions to the wrapper.
+		  each(['concat', 'join', 'slice'], function(name) {
+			var method = ArrayProto[name];
+			_.prototype[name] = function() {
+			  return result.call(this, method.apply(this._wrapped, arguments));
+			};
+		  });
+
+		  _.extend(_.prototype, {
+
+			// Start chaining a wrapped Underscore object.
+			chain: function() {
+			  this._chain = true;
+			  return this;
+			},
+
+			// Extracts the result from a wrapped and chained object.
+			value: function() {
+			  return this._wrapped;
+			}
+		  });
+
 		(function() {
 			var fwTypes = {},
+				fwMethods = {},
 				typeRE = /^\[object (.+)\]$/;
 
 			_.forEach(
 					// return the global properties that begin with the prefix
 					// used by all FW-native types
-				_.filter(_.keys(this), function(key) { 
-					return key.indexOf("_proto_for_fw_") == 0; 
-				}), 
+				_.filter(_.keys(this), function(key) {
+					return key.indexOf("_proto_for_fw_") == 0;
+				}),
 				function(key) {
 					var typeString = this[key].toString(),
 						typeName = typeString.match(typeRE)[1];
 
-						// every FW-specific global prototype object has a 
+						// every FW-specific global prototype object has a
 						// toString() method, the return value of which we add
 						// to the hash of FW-native types
 					fwTypes[typeString] = 1;
 
-					_["is" + typeName] = function(obj)
+					fwMethods["is" + typeName] = function(obj)
 					{
 						return toString.call(obj) == typeString;
 					}
 				}
 			);
-				
-				// we have to override has() because instances of the native FW 
-				// types don't correctly support hasOwnProperty().  
+
+				// replace the auto-generated isGroup method with one that returns
+				// false if it's actually a smart shape
+			fwMethods.isGroup = function(obj)
+			{
+				return toString.call(obj) == "[object Group]" && !obj.isSmartShape;
+			};
+
+				// there's no SmartShape native type, so add a method for it
+			fwMethods.isSmartShape = function(obj)
+			{
+				return obj.isSmartShape === true;
+			};
+
+				// we have to override has() because instances of the native FW
+				// types don't correctly support hasOwnProperty().
 				// hasOwnProperty(dom, "isDirty") returns false but "isDirty" in dom
 				// is true.  so if obj is a native type, fall back to using in.
-			_.has = function(obj, key) {
+			fwMethods.has = function(obj, key) {
 				return (obj in fwTypes && key in obj) || hasOwnProperty.call(obj, key);
 			};
+
+				// add the equivalent of ES5 Object.create()
+			fwMethods.createObject = function(prototype, properties)
+			{
+				var object;
+				function Type() {} // An empty constructor.
+
+				if (prototype === null) {
+					object = { "__proto__": null };
+				} else {
+					if (typeof prototype !== "object" && typeof prototype !== "function") {
+						// In the native implementation `parent` can be `null`
+						// OR *any* `instanceof Object` (Object|Function|Array|RegExp|etc)
+						// Use `typeof` tho, b/c in old IE, DOM elements are not `instanceof Object`
+						// like they are in modern browsers. Using `Object.create` on DOM elements
+						// is...err...probably inappropriate, but the native version allows for it.
+						throw new TypeError("Object prototype may only be an Object or null"); // same msg as Chrome
+					}
+					Type.prototype = prototype;
+					object = new Type();
+					// IE has no built-in implementation of `Object.getPrototypeOf`
+					// neither `__proto__`, but this manually setting `__proto__` will
+					// guarantee that `Object.getPrototypeOf` will work as expected with
+					// objects created using `Object.create`
+					object.__proto__ = prototype;
+				}
+
+				if (properties) {
+					_.extend(object, properties);
+				}
+
+				return object;
+			};
+
+			_.mixin(fwMethods);
 		})();
 
 		  return _;
@@ -1297,10 +1418,10 @@
 			}
 			return "{" + output.join("," + sep) + newLine + _indentStr + "}"; // String
 		}
-		
+
 		return dojo.toJson;
 	})();
-	
+
 
 	// =======================================================================
 	function now()
@@ -1317,12 +1438,12 @@
 		if (arguments.length < 3) {
 			return;
 		}
-		
+
 		inCaller = inCaller || {};
 
 		var s = [],
 			callerName = inCaller.name || "";
-		
+
 		for (var i = 2, len = arguments.length; i < len; i++) {
 			var variant = arguments[i];
 
@@ -1334,17 +1455,17 @@
 				s.push(__StringFormatter__.format(variant));
 			}
 		}
-		
+
 		if (_showStack) {
 			var callers = [];
-				
+
 				// follow the call stack, up to 5 deep, in case we run into a loop
 			for (var depth = 0, fn = inCaller.caller; depth < 5 && fn; depth++, fn = fn.caller) {
 				callers.push(fn.name || ".");
 			}
-			
+
 			if (callers.length) {
-					// we walked the stack from bottom to top, but we want to 
+					// we walked the stack from bottom to top, but we want to
 					// display the calls from top to bottom
 				callers.reverse();
 				callerName = callers.join(" > ") + " > " + (callerName || "anonymous");
@@ -1374,37 +1495,37 @@
 		_timers = {},
 		_watches = [],
 		_showStack = false;
-	
-	
+
+
 		// create the console global
 	console = {
 			// we need to set this so dojo doesn't wipe out the console object
 			// if it loads after us
 		firebug: true,
-		
-		
+
+
 			// the max number of log entries to keep
 		retention: 100,
-		
+
 
 			// this array stores the JSON strings until the panel wants them
 		_logEntries: [],
-		
+
 			// this string temporarily holds the JSON string version of the
 			// _logEntries array
 		_logEntriesJSON: "",
-		
-		
-			// the clear() method sets this to true to let the panel know to 
+
+
+			// the clear() method sets this to true to let the panel know to
 			// clear the log display
 		_clearLog: false,
-		
-		
-			// provide access to the raw addLogEntry so object watchers can 
+
+
+			// provide access to the raw addLogEntry so object watchers can
 			// pass their caller
 		_addLogEntry: addLogEntry,
-		
-		
+
+
 		// ===================================================================
 		_prepLogEntriesJSON: function()
 		{
@@ -1420,13 +1541,13 @@
 				// console._logEntriesJSON to get the JSON string.
 			this._logEntriesJSON = "[" + entries.join(",") + "]";
 		},
-		
-		
+
+
 		// ===================================================================
 		evaluate: function(
 			inCode)
 		{
-				// annoyingly, calling fw.getDocumentDOM() when no docs are 
+				// annoyingly, calling fw.getDocumentDOM() when no docs are
 				// open seems to throw an error, which doesn't seem to get
 				// reported by the console.  to make the console work when no
 				// doc is open, call getDocumentDOM only when something is open.
@@ -1439,7 +1560,7 @@
 
 			try {
 					// eval the code in the context of the underscore library, so
-					// the code can use keys(), pluck(), etc. 
+					// the code can use keys(), pluck(), etc.
 				with (_) {
 					__r__ = __StringFormatter__.format(eval(inCode));
 				}
@@ -1466,12 +1587,12 @@
 			if (_timers[inTimerName]) {
 				var delta = now() - _timers[inTimerName],
 					unit = "ms";
-					
+
 				if (delta >= 1000) {
 					unit = "sec";
 					delta /= 1000;
 				}
-				
+
 				addLogEntry("log", arguments.callee.caller, inTimerName + ":", delta, unit);
 				delete _timers[inTimerName];
 			}
@@ -1525,7 +1646,7 @@
 		{
 			inSegment = inSegment || "-";
 			inCount = isNaN(inCount) ? 60 : inCount;
-			
+
 			var line = [];
 			line.length = Math.round((inCount + 1) / inSegment.length);
 			this.log(line.join(inSegment));
@@ -1539,14 +1660,14 @@
 		{
 			inMessage = inMessage ? inMessage + ": " : "";
 
-				// we need to call StringFormatter ourselves, since if we 
+				// we need to call StringFormatter ourselves, since if we
 				// passed inMessage as a separate parameter, there'd be an extra
 				// space in the log if inMessage was empty.  also pass any args
 				// after inMessage to addLogEntry, so that they get displayed.
 			addLogEntry.apply(this, [
-				"log", 
-				arguments.callee.caller, 
-				inMessage + (inObject === Object(inObject) ? 
+				"log",
+				arguments.callee.caller,
+				inMessage + (inObject === Object(inObject) ?
 					__StringFormatter__.format(_.keys(inObject)) : "null")
 			].concat(_.toArray(arguments).slice(2)));
 		},
@@ -1558,7 +1679,7 @@
 			inMessage)
 		{
 			if (!inAssertion) {
-				addLogEntry.apply(this, ["error", arguments.callee.caller, 
+				addLogEntry.apply(this, ["error", arguments.callee.caller,
 					"ASSERTION FAILED:"].concat(_.toArray(arguments).slice(1)));
 			}
 		},
@@ -1573,31 +1694,31 @@
 			if (inObject === null) {
 				return;
 			}
-			
+
 			if (!inProperties || inProperties == "*") {
 					// the caller wants to watch all the properties on the object
 				inProperties = _.keys(inObject);
 			}
-			
+
 				// turn inProperties into an array if it's just a single string
 				// so we can run it through forEach below
 			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
-			
+
 			var objectName = inObjectName ? (inObjectName + ".") : "",
 					// annoyingly, callbacks used for watching don't seem to
-					// have any closure scope at all.  they can only access 
+					// have any closure scope at all.  they can only access
 					// local vars and literals.  since we want to include an
 					// optional object name in the log call, we have to build
-					// the callback as a string and then call Function().  
-					// instead of calling log(), call the lower-level 
+					// the callback as a string and then call Function().
+					// instead of calling log(), call the lower-level
 					// _addLogEntry so we can pass the watch callback's caller,
 					// which lets the console display its name.
 				callback = Function("inName", "inOldValue", "inNewValue",
-					'console._addLogEntry("log", arguments.callee.caller, ' + 
-					objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' + 
+					'console._addLogEntry("log", arguments.callee.caller, ' +
+					objectName.quote() + ' + inName + ":", inOldValue, "=>", inNewValue);' +
 					'return inNewValue;'
 				);
-					
+
 			_.forEach(inProperties, function(property) {
 					// remember the watched object so we can unwatch it
 				_watches.push({
@@ -1618,16 +1739,16 @@
 			if (inObject === null) {
 				return;
 			}
-			
+
 			if (!inProperties || inProperties == "*") {
 					// the caller wants to unwatch all the properties on the object
 				inProperties = _.keys(inObject);
 			}
-			
+
 				// turn inProperties into an array if it's just a single string
 				// so we can run it through forEach below
 			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
-			
+
 			_.forEach(inProperties, function(property) {
 					// look for the watch object corresponding to this property
 					// and object in _watches
@@ -1635,20 +1756,20 @@
 					var watch = _watches[i];
 
 					if (watch.object === inObject && watch.property == property) {
-							// delete this watch object since we're going to 
+							// delete this watch object since we're going to
 							// unwatch the property
 						_watches.splice(i, 1);
 						break;
 					}
 				}
-				
+
 					// regardless of whether the watch was found, we can unwatch
-					// the property 
+					// the property
 				inObject.unwatch(property);
 			});
 		},
-		
-		
+
+
 		// ===================================================================
 		unwatchAll: function()
 		{
@@ -1659,11 +1780,11 @@
 					watch.object.unwatch(watch.property);
 				}
 			});
-			
+
 				// clear the list now that we've unwatched everything
 			_watches =[];
 		},
-		
+
 
 		// ===================================================================
 		showStack: function(
@@ -1673,14 +1794,14 @@
 				name,
 				call,
 				callKeys,
-				params, 
+				params,
 				paramName,
 				paramValue,
 				paramString,
 				match;
-				
-				// follow the call stack, up to 5 deep, in case we run into a 
-				// recursive function, which causes a loop in the caller chain 
+
+				// follow the call stack, up to 5 deep, in case we run into a
+				// recursive function, which causes a loop in the caller chain
 			for (var depth = 0, fn = arguments.callee.caller; depth < 5 && fn; depth++, fn = fn.caller) {
 				name = fn.name || "anonymous";
 				call = fn.__call__;
@@ -1704,35 +1825,35 @@
 							// representation of things like null
 						paramString = paramValue + "";
 						match = paramString.match(/^\[object (\w+)\]$/);
-						
+
 						if (match) {
 								// extract the name of the type from the string
 							paramString = match[1];
 						}
 					}
-					
+
 					params.push(paramName + ": " + paramString);
 				}
-				
-					// display one call per line 
+
+					// display one call per line
 				stack.push(name + "(" + params.join(", ") + ")");
 			}
-			
+
 			inMessage = inMessage ? " [" + inMessage + "]" : "";
 			stack.push("Call stack" + inMessage + ":");
-			
-				// we walked the stack from bottom to top, but we want to 
+
+				// we walked the stack from bottom to top, but we want to
 				// display the calls from top to bottom.  show "Call stack:"
 				// before the list of calls.
 			stack.reverse();
-			
+
 			stack = _.map(stack, function(item, i) {
 				var spaces = [];
 				spaces.length = i * 2 + 1;
-				
+
 				return spaces.join(" ") + item;
 			});
-			
+
 				// push the stack information directly onto the log array so
 				// that we can control the caller string
 			this._logEntries.push(__stringify({

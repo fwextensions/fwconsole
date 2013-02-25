@@ -1,5 +1,5 @@
 /* ===========================================================================
-	
+
 	File: FireworksConsoleMain.as
 
 	Author - John Dunning
@@ -18,6 +18,7 @@
 		- convert AS objects to JSON and send string to console
 
 		- no longer seems to load the console JS code when it's opened
+			maybe it's trying to load the code before the JS engine is ready?
 
 		- pressing Print .js Logs causes color of all text in console to change
 
@@ -26,7 +27,7 @@
 
 		- add a console method to reset the global space to the state it was in
 			when the panel loaded
-			or maybe just try to delete everything, and hopefully the FW stuff 
+			or maybe just try to delete everything, and hopefully the FW stuff
 				will ignore the delete
 
 		- make console work when no docs are open
@@ -35,21 +36,21 @@
 			might have been a problem with accessing fw.selection[0], but that
 				should be fixed now
 
-		- doesn't seem to track the activeTool anymore 
+		- doesn't seem to track the activeTool anymore
 			fucking FW events just don't seem to work at all, in any version
 			fuck fuck fuck fuck fuck fucking fuck
 			still seem to work in JSML, but copying that code into this app
 				doesn't do anything
 			reverting back to older version doesn't work either
-				only works in old versions that don't poll 
+				only works in old versions that don't poll
 			and now it suddenly started working again, without changing anything
-				and without restarting.  wtf? 
+				and without restarting.  wtf?
 
 		- maybe listen for tool change events and dump the log entries whenever
 			it happens
 			the JS can then set the activeTool to generate an event
 
-		- don't show the printLog error if MMExecute is failing 
+		- don't show the printLog error if MMExecute is failing
 
 		- toggle for return evaluating the code
 
@@ -69,14 +70,14 @@
 		- support ctrl-backspace to delete by word, and ctrl-arrow for move by word
 
 	Done:
-		- include trace library in AS and load it with FireworksConsole.js 
+		- include trace library in AS and load it with FireworksConsole.js
 
 		- move evaluateCode to the console object instead of jdlib.FireworksConsole
 
 		- support "el" variable for fw.selection[0]
 
 		- doing sel[0] on a RectanglePrimitive in CS5 returns a negative error
-			works in earlier versions? 
+			works in earlier versions?
 
 		- clean up UI, use standard grey colors
 
@@ -138,6 +139,8 @@ private const SupportedFWEvents:Object = {
 	onFwApplicationActivate: 1,
 	onFwApplicationDeactivate: 1,
 
+	onFwPreferencesChange: 1,
+
 		// if we want to get called on setfwActiveToolForSWFs, then we have to
 		// tell FW that we also want these events.  otherwise, it doesn't seem
 		// to call setfwActiveToolForSWFs.
@@ -167,7 +170,7 @@ private var consolePollTimer:Timer = new Timer(ConsolePollInterval);
 private var currentTool:String = "";
 private var logs:Array = [];
 
-  
+
 // ===========================================================================
 private function onPreinitialize() : void
 {
@@ -203,6 +206,15 @@ try {
 				consolePollTimer.stop();
 			}
 		);
+
+// the onFwPreferencesChange event doesn't seem to get fired when fw.setPref()
+// is called, so we couldn't use this as a way to signal from the JS to the AS
+//		ExternalInterface.addCallback("onFwPreferencesChange",
+//			function()
+//			{
+//				print("onFwPreferencesChange", "");
+//			}
+//		);
 	}
 } catch (e:*) {
 logs.push("ERROR");
@@ -212,13 +224,13 @@ logs.push(e.message);
 
 
 // ===========================================================================
-private function main() : void 
+private function main() : void
 {
 	IOContainer.addEventListener(DividerEvent.DIVIDER_RELEASE, onDividerRelease, false, 0, true);
-	
+
 	Input = Input;
 	Output = Output;
-	
+
 	Input.addEventListener(KeyboardEvent.KEY_DOWN, onInputKeyDown, true, 0, true);
 	Input.addEventListener(TextEvent.TEXT_INPUT, onTextInput, false, 0, true);
 	Input.setFocus();
@@ -226,15 +238,15 @@ private function main() : void
 	Output.htmlText = prefs.data.savedOutput || "";
 	Output.validateNow();
 	Output.verticalScrollPosition = Output.maxVerticalScrollPosition;
-	
+
 	prefs.data.codeEntries = prefs.data.codeEntries || [];
 	currentCodeEntry = prefs.data.codeEntries.length;
-	
+
 	stage.addEventListener(KeyboardEvent.KEY_DOWN, onStageKeyDown, false, 0, true);
 	stage.addEventListener(ErrorEvent.ERROR, onError, false, 0, true);
 	stage.addEventListener(FlexEvent.EXIT_STATE, onExit, false, 0, true);
 
-		// default to a height of 50 for the 
+		// default to a height of 50 for the
 	prefs.data.dividerY = prefs.data.dividerY || 50;
 	IOContainer.getDividerAt(0).y = prefs.data.dividerY;
 
@@ -253,7 +265,7 @@ private function main() : void
 
 		// make console.log() available to other panels
 	initLocalConnection();
-	
+
 	loadFCJS();
 
 //var lc:LocalConnection = new LocalConnection();
@@ -279,20 +291,20 @@ private function evaluateCode(inClearInput:Boolean = true) : void
 {
 try {
 	var code:String = Input.text;
-	
+
 	if (code.length == 0) {
 		return;
 	}
-	
+
 	addCodeEntry(code);
-	
+
 	if (inClearInput) {
 		Input.text = "";
 	}
-	
+
 		// serialize the code string to handle quotations, newlines, etc.
 	var result:String = callMethod('console.evaluate', code);
-	
+
 	print(LogEntryPrefix + " " + code + ":", result + "\n");
 } catch (e:*) {
 log("eval error", e.message);
@@ -320,10 +332,10 @@ private function print(
 			// there's no prefix, so we don't need to deal with html-formatted text
 		Output.text += inText;
 	}
-	 
+
 	prefs.data.savedOutput = Output.htmlText;
 	prefs.flush(90);
-	
+
 		// force the text area to validate so we get the correct max scroll
 		// height after adding the text
 	Output.validateNow();
@@ -350,7 +362,7 @@ private function addCodeEntry(
 		prefs.data.codeEntries.push(inCode);
 		prefs.flush(90);
 	}
-	
+
 	currentCodeEntry = prefs.data.codeEntries.length;
 }
 
@@ -369,7 +381,7 @@ private function showPreviousCodeEntry() : void
 private function showNextCodeEntry() : void
 {
 	var codeEntries:Array = prefs.data.codeEntries;
-	
+
 	if (currentCodeEntry + 1 <= codeEntries.length - 1) {
 		currentCodeEntry++;
 		setInputText(codeEntries[currentCodeEntry]);
@@ -383,8 +395,8 @@ private function showNextCodeEntry() : void
 // ===========================================================================
 private function clearOutput() : void
 {
-		// to clear the output, we seem to have to also set the htmlText 
-		// property to an empty string.  setting just the text property can 
+		// to clear the output, we seem to have to also set the htmlText
+		// property to an empty string.  setting just the text property can
 		// display a "null" string in the log.  possibly htmlText is null after
 		// text is cleared, so Output.htmlText += "..." prepends the null.
 	Output.text = "";
@@ -509,7 +521,7 @@ private function onTextInput(
 	inEvent:TextEvent) : void
 {
 	var ascii:int = inEvent.text.charCodeAt(0);
-	
+
 		// don't allow newlines or returns, unless shift is down
 	if (!isShiftDown && (ascii == 13 || ascii == 10)) {
 			// stop the event propagation so that he newline doesn't get
@@ -531,7 +543,7 @@ private function onInputKeyDown(
 				showPreviousCodeEntry();
 			}
 			break;
-			
+
 		case Keyboard.DOWN:
 			if (inEvent.ctrlKey) {
 				showNextCodeEntry();
@@ -614,7 +626,7 @@ private function onError(
 private function onExit(
 	inEvent:FlexEvent) : void
 {
-// this handler never seems to get called before the panel is closed 
+// this handler never seems to get called before the panel is closed
 	prefs.data.savedOutput = Output.text;
 	prefs.data.dividerY = IOContainer.getDividerAt(0).y;
 	prefs.data.enablePolling = consolePollingEnabled;
