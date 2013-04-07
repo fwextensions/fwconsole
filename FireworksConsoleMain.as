@@ -226,6 +226,7 @@ logs.push(e.message);
 // ===========================================================================
 private function main() : void
 {
+try {
 	IOContainer.addEventListener(DividerEvent.DIVIDER_RELEASE, onDividerRelease, false, 0, true);
 
 	Input = Input;
@@ -273,16 +274,26 @@ private function main() : void
 
 //log("Input", Debug.dump({ foo: 42 }));
 //log(logs.join("\n"));
+
+} catch (e:Error) {
+//MMExecute('alert("' + e.message + '")');
+}
 }
 
 
 // ===========================================================================
 private function initLocalConnection() : void
 {
-		// the main app object implements the functions that can be called by
-		// the LocalConnection (log)
-	consoleLC.client = this;
-	consoleLC.connect("FireworksConsole");
+	try {
+			// the main app object implements the functions that can be called by
+			// the LocalConnection (log)
+		consoleLC.client = this;
+		consoleLC.connect("FireworksConsole");
+	} catch(e:*) {
+		// if there's already a LocalConnection with this name in the player's
+		// memory, an exception will be thrown.  but just ignoring this seems
+		// to be fine.
+	}
 }
 
 
@@ -393,7 +404,8 @@ private function showNextCodeEntry() : void
 
 
 // ===========================================================================
-private function clearOutput() : void
+private function clearOutput(
+	inEvent:MouseEvent = null) : void
 {
 		// to clear the output, we seem to have to also set the htmlText
 		// property to an empty string.  setting just the text property can
@@ -403,8 +415,10 @@ private function clearOutput() : void
 	Output.htmlText = "";
 	prefs.data.savedOutput = "";
 
-		// switch the focus from the button back to the doc
-	callMethod("fw.moveFocusToDoc");
+		// if the ctrl key is down, save the current log file in a new
+		// time-stamped file
+	MMExecute("console.clear(" + (inEvent && inEvent.ctrlKey) +
+		"); console._clearLog = false; fw.moveFocusToDoc();");
 }
 
 
@@ -444,8 +458,6 @@ private function printLog(
 
 		if (JSON.decode(clearLog)) {
 				// the user has called console.clear(), so clear our log display
-				// and bail
-			MMExecute("console._clearLog = false;");
 			clearOutput();
 		}
 
@@ -485,6 +497,9 @@ private function loadFCJS() : void
 		// load the embedded JS into FW, since it hasn't been during this session
 	MMExecute((new FireworksConsoleJS()).toString());
 	MMExecute((new TraceJS()).toString());
+
+		// tell the JS where the .swf file is
+	MMExecute('console._swfPath = "' + stage.loaderInfo.url + '";');
 }
 
 

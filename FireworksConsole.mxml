@@ -18,34 +18,34 @@
 	layout="absolute"
 	width="100%"
 	height="100%"
-	horizontalAlign="left"	
+	horizontalAlign="left"
 	backgroundGradientColors="[0xeeeeee, 0xd6d6d6]"
 	backgroundColor="0xd6d6d6"
 	preinitialize="onPreinitialize()"
-	applicationComplete="main()" 
+	applicationComplete="main()"
 >
 	<mx:Style source="assets/ConsoleStyles.css"/>
 	<mx:Script source="FireworksConsoleMain.as" />
-	
-	<mx:ApplicationControlBar 
-		dock="true" 
+
+	<mx:ApplicationControlBar
+		dock="true"
 		paddingTop="5"
-		paddingRight="4" 
+		paddingRight="4"
 		paddingBottom="4"
 		paddingLeft="5"
 		horizontalGap="5"
 		fillAlphas="[0.45,0]"
 		dropShadowEnabled="false"
 	>
-		<mx:Button 
+		<mx:Button
 			label="Eval"
 			toolTip="Evaluate the JavaScript entered below"
 			click="evaluateCode();"
 		/>
-		<mx:Button 
+		<mx:Button
 			label="Clear"
-			toolTip="Clear the history area" 
-			click="clearOutput();"
+			toolTip="Clear the history area"
+			click="clearOutput(event);"
 		/>
         <mx:ButtonBar
 			itemClick="onHistoryItemClick(event)"
@@ -92,14 +92,14 @@
 			width="100%"
 			minHeight="100"
 			editable="false"
-			horizontalScrollPolicy="off" 
+			horizontalScrollPolicy="off"
 		/>
 <!--		<mx:TextArea id="Log"
 			width="100%"
 			minHeight="100"
 			editable="false"
-			horizontalScrollPolicy="off" 
+			horizontalScrollPolicy="off"
 		/>-->
 	</mx:VDividedBox>
-	
+
 </mx:Application>

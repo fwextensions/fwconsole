@@ -11,10 +11,10 @@
 
 /*
 	To do:
-		- add functions for isRectangle, isText, etc.
-
 		- the real console.trace does a live version of showStack
 			change the name?
+
+		- add checkbox for saving log to file in panel and pass setting to JS
 
 		- setting dojo to null in an eval'd script sets it to null in the
 			scope of the console, breaking log()
@@ -56,6 +56,16 @@
 				goes right to the global context
 
 	Done:
+		- save log file wherever the panel actually is
+
+		- clear the log file when Clear is clicked in the panel
+
+		- also save result of eval to log file?
+
+		- pass true to clear() to keep a timestamped copy of the .txt file around
+
+		- add functions for isRectangle, isText, etc.
+
 		- show just anon() in the stack prefix, so it's more compact
 			or maybe just main() > () > ()
 
@@ -88,8 +98,8 @@
 
 
 // ===========================================================================
-(function()
-{
+(function() {
+	// =======================================================================
 	var __StringFormatter__ = {
 		format: function(
 			inValue,
@@ -224,6 +234,7 @@
 	};
 
 
+	// =======================================================================
 	var _ = (function() {
 		// these functions are pulled from the Underscore.js library and slightly
 		// modified to handle the quirks of FW's JS engine.
@@ -1325,6 +1336,7 @@
 	})();
 
 
+	// =======================================================================
 	var __stringify = (function() {
 			// embed a local copy of the dojo JSON library, which has been changed
 			// to not depend on any other part of dojo.  that way, we don't have to
@@ -1431,6 +1443,90 @@
 
 
 	// =======================================================================
+	var __logFile = (function() {
+		var logFileName = "Fireworks Console",
+			logFilePath;
+
+
+		function convertURLToOSPath(
+			inURL)
+		{
+			var path;
+
+			if (fw.platform == "win") {
+					// replace file:///C| with C: and turn / into \
+				path = inURL.replace(/file:\/\/\/([A-Z])\|/, "$1:");
+				path = path.replace(/\//g, "\\");
+			} else {
+					// replace file:/// with /Volumes/
+				path = inURL.replace(/file:\/\//, "/Volumes");
+			}
+
+			return unescape(path);
+		}
+
+
+		function prefixZero(
+			inValue)
+		{
+			return ("0" + inValue).slice(-2);
+		}
+
+
+		return {
+			append: function(
+				inCallerName,
+				inText)
+			{
+				if (!logFilePath || !Files.exists(logFilePath)) {
+						// save the console file at whatever path the panel
+						// passed into us via _swfPath
+					logFilePath = Files.getDirectory(console._swfPath) + "/" +
+						logFileName + ".txt";
+
+						// first create the file so we can set its Mac type
+					Files.createFile(logFilePath, "TEXT", "????");
+				}
+
+				var file = new File(convertURLToOSPath(logFilePath)),
+					result = false;
+
+				inText = ">>> " + (inCallerName ? inCallerName + "(): " : "") + inText + "\n";
+
+				if (file.open("append")) {
+						// for some bizarre reason, file.write() appends a newline
+						// to the string that's written, but file.writeln() doesn't,
+						// despite the source code looking correct.
+					result = file.writeln(inText);
+					file.close();
+				}
+
+				return result;
+			},
+			clear: function(
+				inKeepFile)
+			{
+				if (inKeepFile) {
+					var now = new Date(),
+						date = [
+							now.getFullYear(),
+							prefixZero(now.getMonth() + 1),
+							prefixZero(now.getDay())
+						].join("-"),
+							// convert the : to . so the time works as a Mac filename
+						time = now.toTimeString().match(/([\d:]+)/)[1].replace(/:/g, "."),
+						filename = typeof inKeepFile == "string" ? inKeepFile : logFileName;
+
+					Files.rename(logFilePath, [filename, date, time].join(" ") + ".txt");
+				} else {
+					Files.deleteFileIfExisting(logFilePath);
+				}
+			}
+		};
+	})();
+
+
+	// =======================================================================
 	function addLogEntry(
 		inType,
 		inCaller)
@@ -1442,6 +1538,7 @@
 		inCaller = inCaller || {};
 
 		var s = [],
+			logEntryText,
 			callerName = inCaller.name || "";
 
 		for (var i = 2, len = arguments.length; i < len; i++) {
@@ -1472,6 +1569,8 @@
 			}
 		}
 
+		logEntryText = s.join(" ");
+
 			// due to the annoying-as-fuck modal "processing command" dialog that
 			// will appear on top of FW and require a force-quit if the call stack
 			// gets more than one or two levels deep, we can't delay the conversion
@@ -1480,7 +1579,7 @@
 			// now, and push the string onto an array.  ffs.
 		console._logEntries.push(__stringify({
 			type: inType,
-			text: s.join(" "),
+			text: logEntryText,
 			caller: callerName,
 			time: now()
 		}));
@@ -1488,6 +1587,8 @@
 			// keep only the last X log entries, in case the console panel
 			// isn't picking them up
 		console._logEntries = console._logEntries.slice(-console.retention);
+
+		__logFile.append(callerName, logEntryText);
 	}
 
 
@@ -1519,6 +1620,9 @@
 			// the clear() method sets this to true to let the panel know to
 			// clear the log display
 		_clearLog: false,
+
+
+		_swfPath: "",
 
 
 			// provide access to the raw addLogEntry so object watchers can
@@ -1555,7 +1659,6 @@
 				sel = fw.selection,
 				el = fw.selection && fw.selection[0],
 				global = (function() { return this; })(),
-				__e__,
 				__r__;
 
 			try {
@@ -1564,9 +1667,11 @@
 				with (_) {
 					__r__ = __StringFormatter__.format(eval(inCode));
 				}
-			} catch (__e__) {
-				__r__ = __e__.toString();
+			} catch (e) {
+				__r__ = e.toString();
 			}
+
+			__logFile.append("", __r__);
 
 			return __r__;
 		},
@@ -1576,7 +1681,7 @@
 		time: function(
 			inTimerName)
 		{
-			_timers[inTimerName] = now()
+			_timers[inTimerName] = now();
 		},
 
 
@@ -1874,11 +1979,13 @@
 
 
 		// ===================================================================
-		clear: function()
+		clear: function(
+			inKeepFile)
 		{
 			this._logEntries = [];
 			this._logEntriesJSON = "";
 			this._clearLog = true;
+			__logFile.clear(inKeepFile);
 		}
 	};
 
