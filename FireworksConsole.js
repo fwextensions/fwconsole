@@ -16,9 +16,6 @@
 
 		- add checkbox for saving log to file in panel and pass setting to JS
 
-		- setting dojo to null in an eval'd script sets it to null in the
-			scope of the console, breaking log()
-
 		- maybe accessing a getter on the console wouldn't cause the processing
 			dialog, and it could return the stringified JSON
 
@@ -29,11 +26,6 @@
 
 		- maybe have option to prefix logs with name of JS file
 			only works up to the first runScript in a file
-
-		- put the eval call in a separate anonymous function that only has
-			access to _ and the vars it defines
-			so don't have to call it __StringFormatter__
-			return the eval result to another function that formats the string
 
 		- put trace on console.trace()?
 
@@ -56,6 +48,14 @@
 				goes right to the global context
 
 	Done:
+		- setting dojo to null in an eval'd script sets it to null in the
+			scope of the console, breaking log()
+
+		- put the eval call in a separate anonymous function that only has
+			access to _ and the vars it defines
+			so don't have to call it __StringFormatter__
+			return the eval result to another function that formats the string
+
 		- save log file wherever the panel actually is
 
 		- clear the log file when Clear is clicked in the panel
@@ -98,140 +98,14 @@
 
 
 // ===========================================================================
-(function() {
+(function(
+	evaluate)
+{
 	// =======================================================================
-	var __StringFormatter__ = {
-		format: function(
-			inValue,
-			inDepth)
-		{
-			var valueType = typeof inValue;
-
-			if (inDepth > 10) {
-				return "<< MAX DEPTH REACHED >>";
-			} else if (this[valueType]) {
-				return this[valueType](inValue, inDepth);
-			} else {
-				return "UNKNOWN";
-			}
-		},
-
-
-		"array": function(
-			inArray,
-			inDepth)
-		{
-			inDepth = inDepth || 0;
-			var items = [];
-
-			for (var i = 0, len = inArray.length; i < len; i++) {
-				items.push(this.format(inArray[i], inDepth + 1));
-			}
-
-			return "[" + items.join(", ") + "]";
-		},
-
-
-		"object": function(
-			inObject,
-			inDepth,
-			inAttributes)
-		{
-			inDepth = inDepth || 0;
-
-			if (inObject == null) {
-				return "null";
-			} else if (inObject instanceof Array || inObject.toString() == "[object FwArray]" ||
-					inObject.toString() == "[object Arguments]") {
-				return this.array(inObject, inDepth);
-			} else if (typeof inObject.__repr__ == "function") {
-				return inObject.__repr__();
-			}
-
-			var emptyObject = {},
-				keys = [];
-
-			if (typeof inAttributes == "undefined") {
-				try {
-					for (var attribute in inObject) {
-						if (!(attribute in emptyObject)) {
-							keys.push(attribute);
-						}
-					}
-				} catch (exception) { }
-
-				keys.sort();
-			} else {
-				keys = inAttributes;
-			}
-
-			if (keys.length == 0) {
-					// don't waste 3 lines on an empty object
-				return "{ }";
-			}
-
-			var attributes = [];
-
-			for (var i = 0, len = keys.length; i < len; i++) {
-				var key = keys[i];
-
-					// skip javascriptString, since it's a string representation
-					// of the object, which we're building ourselves.  also skip
-					// pathOperation, which throws an exception if you just
-					// look at it funny.
-				if (key != "javascriptString" && key != "pathOperation") {
-					attributes.push(key + ": " + this.format(inObject[key], inDepth + 1));
-				}
-			}
-
-			var tabs = "\t",
-				result;
-
-			while (inDepth-- > 0) { tabs += "\t"; }
-
-			if (attributes.length < 5) {
-				result = "{ " + attributes.join(", ") + " }";
-			} else {
-				result = ["{\n", tabs, attributes.join(",\n" + tabs), "\n", tabs.slice(1), "}"].join("");
-			}
-
-			return result;
-		},
-
-
-		"string": function(
-			inString)
-		{
-			return '"' + inString + '"';
-		},
-
-
-		"number": function(
-			inNumber)
-		{
-			return inNumber.toString();
-		},
-
-
-		"boolean": function(
-			inBoolean)
-		{
-			return inBoolean.toString();
-		},
-
-
-		"function": function(
-			inFunction)
-		{
-			return "function() {...}";
-		},
-
-
-		"undefined": function()
-		{
-			return "undefined";
-		}
-	};
+	function now()
+	{
+		return (new Date()).getTime();
+	}
 
 
 	// =======================================================================
@@ -1337,7 +1211,142 @@
 
 
 	// =======================================================================
-	var __stringify = (function() {
+	var StringFormatter = {
+		format: function(
+			inValue,
+			inDepth)
+		{
+			var valueType = typeof inValue;
+
+			if (inDepth > 10) {
+				return "<< MAX DEPTH REACHED >>";
+			} else if (this[valueType]) {
+				return this[valueType](inValue, inDepth);
+			} else {
+				return "UNKNOWN";
+			}
+		},
+
+
+		"array": function(
+			inArray,
+			inDepth)
+		{
+			inDepth = inDepth || 0;
+			var items = [];
+
+			for (var i = 0, len = inArray.length; i < len; i++) {
+				items.push(this.format(inArray[i], inDepth + 1));
+			}
+
+			return "[" + items.join(", ") + "]";
+		},
+
+
+		"object": function(
+			inObject,
+			inDepth,
+			inAttributes)
+		{
+			inDepth = inDepth || 0;
+
+			if (inObject == null) {
+				return "null";
+			} else if (inObject instanceof Array || inObject.toString() == "[object FwArray]" ||
+					inObject.toString() == "[object Arguments]") {
+				return this.array(inObject, inDepth);
+			} else if (typeof inObject.__repr__ == "function") {
+				return inObject.__repr__();
+			}
+
+			var emptyObject = {},
+				keys = [];
+
+			if (typeof inAttributes == "undefined") {
+				try {
+					for (var attribute in inObject) {
+						if (!(attribute in emptyObject)) {
+							keys.push(attribute);
+						}
+					}
+				} catch (exception) { }
+
+				keys.sort();
+			} else {
+				keys = inAttributes;
+			}
+
+			if (keys.length == 0) {
+					// don't waste 3 lines on an empty object
+				return "{ }";
+			}
+
+			var attributes = [];
+
+			for (var i = 0, len = keys.length; i < len; i++) {
+				var key = keys[i];
+
+					// skip javascriptString, since it's a string representation
+					// of the object, which we're building ourselves.  also skip
+					// pathOperation, which throws an exception if you just
+					// look at it funny.
+				if (key != "javascriptString" && key != "pathOperation") {
+					attributes.push(key + ": " + this.format(inObject[key], inDepth + 1));
+				}
+			}
+
+			var tabs = "\t",
+				result;
+
+			while (inDepth-- > 0) { tabs += "\t"; }
+
+			if (attributes.length < 5) {
+				result = "{ " + attributes.join(", ") + " }";
+			} else {
+				result = ["{\n", tabs, attributes.join(",\n" + tabs), "\n", tabs.slice(1), "}"].join("");
+			}
+
+			return result;
+		},
+
+
+		"string": function(
+			inString)
+		{
+			return '"' + inString + '"';
+		},
+
+
+		"number": function(
+			inNumber)
+		{
+			return inNumber.toString();
+		},
+
+
+		"boolean": function(
+			inBoolean)
+		{
+			return inBoolean.toString();
+		},
+
+
+		"function": function(
+			inFunction)
+		{
+			return "function() {...}";
+		},
+
+
+		"undefined": function()
+		{
+			return "undefined";
+		}
+	};
+
+
+	// =======================================================================
+	var stringify = (function() {
 			// embed a local copy of the dojo JSON library, which has been changed
 			// to not depend on any other part of dojo.  that way, we don't have to
 			// rely on external libraries.  unlike Crockford's library, the dojo
@@ -1436,14 +1445,7 @@
 
 
 	// =======================================================================
-	function now()
-	{
-		return (new Date()).getTime();
-	}
-
-
-	// =======================================================================
-	var __logFile = (function() {
+	var logFile = (function() {
 		var logFileName = "Fireworks Console",
 			logFilePath;
 
@@ -1549,7 +1551,7 @@
 					// want double quotes around strings when calling log("here's a string");
 				s.push(variant);
 			} else {
-				s.push(__StringFormatter__.format(variant));
+				s.push(StringFormatter.format(variant));
 			}
 		}
 
@@ -1577,7 +1579,7 @@
 			// of the log entries to JSON until the console polls for the latest
 			// entries.  so we have to convert the parameters to a JSON string
 			// now, and push the string onto an array.  ffs.
-		console._logEntries.push(__stringify({
+		console._logEntries.push(stringify({
 			type: inType,
 			text: logEntryText,
 			caller: callerName,
@@ -1588,7 +1590,7 @@
 			// isn't picking them up
 		console._logEntries = console._logEntries.slice(-console.retention);
 
-		__logFile.append(callerName, logEntryText);
+		logFile.append(callerName, logEntryText);
 	}
 
 
@@ -1622,6 +1624,8 @@
 		_clearLog: false,
 
 
+			// the path to the console .swf panel, set by the AS side after the
+			// JS is loaded
 		_swfPath: "",
 
 
@@ -1651,29 +1655,21 @@
 		evaluate: function(
 			inCode)
 		{
-				// annoyingly, calling fw.getDocumentDOM() when no docs are
-				// open seems to throw an error, which doesn't seem to get
-				// reported by the console.  to make the console work when no
-				// doc is open, call getDocumentDOM only when something is open.
-			var dom = fw.documents.length && fw.getDocumentDOM(),
-				sel = fw.selection,
-				el = fw.selection && fw.selection[0],
-				global = (function() { return this; })(),
-				__r__;
+			var result;
 
 			try {
-					// eval the code in the context of the underscore library, so
-					// the code can use keys(), pluck(), etc.
-				with (_) {
-					__r__ = __StringFormatter__.format(eval(inCode));
-				}
+					// pass the _ library into the evaluate function, since _ is
+					// not in its scope
+				result = StringFormatter.format(evaluate(inCode, _));
 			} catch (e) {
-				__r__ = e.toString();
+					// the eval in evaluate may throw an exception, so convert
+					// it to a string
+				result = e.toString();
 			}
 
-			__logFile.append("", __r__);
+			logFile.append("", result);
 
-			return __r__;
+			return result;
 		},
 
 
@@ -1773,7 +1769,7 @@
 				"log",
 				arguments.callee.caller,
 				inMessage + (inObject === Object(inObject) ?
-					__StringFormatter__.format(_.keys(inObject)) : "null")
+					StringFormatter.format(_.keys(inObject)) : "null")
 			].concat(_.toArray(arguments).slice(2)));
 		},
 
@@ -1807,7 +1803,7 @@
 
 				// turn inProperties into an array if it's just a single string
 				// so we can run it through forEach below
-			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
+			inProperties = [].concat(inProperties);
 
 			var objectName = inObjectName ? (inObjectName + ".") : "",
 					// annoyingly, callbacks used for watching don't seem to
@@ -1852,7 +1848,7 @@
 
 				// turn inProperties into an array if it's just a single string
 				// so we can run it through forEach below
-			inProperties = _.isArray(inProperties) ? inProperties : [inProperties];
+			inProperties = [].concat(inProperties);
 
 			_.forEach(inProperties, function(property) {
 					// look for the watch object corresponding to this property
@@ -1961,7 +1957,7 @@
 
 				// push the stack information directly onto the log array so
 				// that we can control the caller string
-			this._logEntries.push(__stringify({
+			this._logEntries.push(stringify({
 				type: "log",
 				text: stack.join("\n"),
 				caller: "",
@@ -1985,7 +1981,7 @@
 			this._logEntries = [];
 			this._logEntriesJSON = "";
 			this._clearLog = true;
-			__logFile.clear(inKeepFile);
+			logFile.clear(inKeepFile);
 		}
 	};
 
@@ -2010,4 +2006,28 @@
 	}
 
 	log = console.log;
-})();
+})(
+		// this function is defined outside the main module so that it can't see
+		// any of the module's variables
+	function(
+		inCode,
+		_)
+	{
+			// annoyingly, calling fw.getDocumentDOM() when no docs are
+			// open seems to throw an error, which doesn't seem to get
+			// reported by the console.  to make the console work when no
+			// doc is open, call getDocumentDOM only when something is open.
+		var dom = fw.documents.length && fw.getDocumentDOM(),
+			sel = fw.selection,
+			el = fw.selection && fw.selection[0],
+			global = (function() { return this; })();
+
+			// eval the code in the context of the underscore library, so
+			// the code can use keys(), pluck(), etc.  we don't wrap the eval
+			// in a try/catch so that our caller can catch the exception and
+			// treat it differently.
+		with (_) {
+			return eval(inCode);
+		}
+	}
+);
